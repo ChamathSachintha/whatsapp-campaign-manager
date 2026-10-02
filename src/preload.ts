@@ -20,5 +20,17 @@ contextBridge.exposeInMainWorld(
       ipcRenderer.invoke(
         'imports:choose-file',
       ),
+
+    validateContactFile: (
+      options: {
+        filePath: string;
+        phoneColumn: string;
+        nameColumn?: string | null;
+      },
+    ) =>
+      ipcRenderer.invoke(
+        'imports:validate-file',
+        options,
+      ),
   },
 );

@@ -45,6 +45,15 @@ declare global {
             | ContactValidationResult
             | null;
         }>;
+
+      validateContactFile: (
+        options: {
+          filePath: string;
+          phoneColumn: string;
+          nameColumn?: string | null;
+        },
+      ) =>
+        Promise<ContactValidationResult>;
     };
   }
 }

@@ -120,6 +120,54 @@ app.whenReady().then(() => {
     parsed.rows,
   );
 
+  ipcMain.handle(
+  'imports:validate-file',
+  (
+    _event,
+    options: {
+      filePath: string;
+      phoneColumn: string;
+      nameColumn?: string | null;
+    },
+  ) => {
+    const parsed =
+      parseContactFile(
+        options.filePath,
+      );
+
+    if (
+      !parsed.columns.includes(
+        options.phoneColumn,
+      )
+    ) {
+      throw new Error(
+        'Selected phone column does not exist in the file.',
+      );
+    }
+
+    if (
+      options.nameColumn &&
+      !parsed.columns.includes(
+        options.nameColumn,
+      )
+    ) {
+      throw new Error(
+        'Selected name column does not exist in the file.',
+      );
+    }
+
+    return validateContacts({
+      rows: parsed.rows,
+
+      phoneColumn:
+        options.phoneColumn,
+
+      nameColumn:
+        options.nameColumn ?? null,
+    });
+  },
+);
+
 const validationResult =
   detectedColumns.phoneColumn
     ? validateContacts({
