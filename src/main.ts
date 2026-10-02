@@ -1,38 +1,60 @@
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-} from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+
 import path from 'node:path';
-import { parseContactFile } from './services/imports/file-parser';
+
 import started from 'electron-squirrel-startup';
-import {
-  closeDatabase,
-  initializeDatabase,
-} from './db/database';
+
+import { closeDatabase, initializeDatabase } from './db/database';
+
 import { getDatabaseHealth } from './db/health';
 
+import { detectContactColumns } from './services/imports/column-detector';
+
+import { validateContacts } from './services/imports/contact-validator';
+
+import { parseContactFile } from './services/imports/file-parser';
+
+import {
+  deleteSavedImport,
+  getSavedImportDetails,
+  listSavedImports,
+  saveValidatedImport,
+} from './services/imports/import-repository';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
+
+/* =========================================================
+   SQUIRREL STARTUP
+   ========================================================= */
 
 if (started) {
   app.quit();
 }
 
+/* =========================================================
+   CREATE MAIN WINDOW
+   ========================================================= */
+
 const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
+
     minWidth: 1100,
     minHeight: 700,
+
     show: false,
+
     backgroundColor: '#f8fafc',
+
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
+
       contextIsolation: true,
+
       nodeIntegration: false,
+
       sandbox: true,
     },
   });
@@ -43,6 +65,7 @@ const createWindow = (): void => {
     void mainWindow.loadFile(
       path.join(
         __dirname,
+
         `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
       ),
     );
@@ -53,27 +76,36 @@ const createWindow = (): void => {
   });
 };
 
+/* =========================================================
+   APP READY
+   ========================================================= */
+
 app.whenReady().then(() => {
+  /* -------------------------------------------------------
+     DATABASE
+     ------------------------------------------------------- */
+
   initializeDatabase();
-  ipcMain.handle(
-  'database:get-health',
-  () => {
+
+  /* -------------------------------------------------------
+     DATABASE HEALTH
+     ------------------------------------------------------- */
+
+  ipcMain.handle('database:get-health', () => {
     console.log('[IPC] database:get-health called');
 
     const result = getDatabaseHealth();
 
-    console.log(
-      '[IPC] database health result:',
-      result,
-    );
+    console.log('[IPC] database health result:', result);
 
     return result;
-  },
-);
+  });
 
-  ipcMain.handle(
-  'imports:choose-file',
-  async () => {
+  /* -------------------------------------------------------
+     CHOOSE CONTACT FILE
+     ------------------------------------------------------- */
+
+  ipcMain.handle('imports:choose-file', async () => {
     const result = await dialog.showOpenDialog({
       title: 'Choose Contact File',
 
@@ -82,20 +114,13 @@ app.whenReady().then(() => {
       filters: [
         {
           name: 'Contact Files',
-          extensions: [
-            'csv',
-            'md',
-            'xlsx',
-            'xls',
-          ],
+
+          extensions: ['csv', 'md', 'xlsx', 'xls'],
         },
       ],
     });
 
-    if (
-      result.canceled ||
-      result.filePaths.length === 0
-    ) {
+    if (result.canceled || result.filePaths.length === 0) {
       return {
         canceled: true,
       };
@@ -103,8 +128,19 @@ app.whenReady().then(() => {
 
     const filePath = result.filePaths[0];
 
-    const parsed =
-      parseContactFile(filePath);
+    const parsed = parseContactFile(filePath);
+
+    const detectedColumns = detectContactColumns(parsed.columns, parsed.rows);
+
+    const validationResult = detectedColumns.phoneColumn
+      ? validateContacts({
+          rows: parsed.rows,
+
+          phoneColumn: detectedColumns.phoneColumn,
+
+          nameColumn: detectedColumns.nameColumn,
+        })
+      : null;
 
     return {
       canceled: false,
@@ -117,13 +153,143 @@ app.whenReady().then(() => {
 
       columns: parsed.columns,
 
-      sampleRows:
-        parsed.rows.slice(0, 5),
+      suggestedPhoneColumn: detectedColumns.phoneColumn,
+
+      suggestedNameColumn: detectedColumns.nameColumn,
+
+      sampleRows: parsed.rows.slice(0, 5),
+
+      validationResult,
     };
-  },
-);
+  });
+
+  /* -------------------------------------------------------
+     LIST SAVED IMPORTS
+     ------------------------------------------------------- */
+
+  ipcMain.handle('imports:list', () => {
+    return listSavedImports();
+  });
+
+  /* -------------------------------------------------------
+     GET SAVED IMPORT DETAILS
+     ------------------------------------------------------- */
+
+  ipcMain.handle('imports:get-details', (_event, importId: string) => {
+    const result = getSavedImportDetails(importId);
+
+    if (!result) {
+      throw new Error('Saved import was not found.');
+    }
+
+    return result;
+  });
+
+  /* -------------------------------------------------------
+     VALIDATE CONTACT FILE
+     ------------------------------------------------------- */
+
+  ipcMain.handle(
+    'imports:validate-file',
+    (
+      _event,
+
+      options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+      },
+    ) => {
+      const parsed = parseContactFile(options.filePath);
+
+      if (!parsed.columns.includes(options.phoneColumn)) {
+        throw new Error('Selected phone column does not exist in the file.');
+      }
+
+      if (options.nameColumn && !parsed.columns.includes(options.nameColumn)) {
+        throw new Error('Selected name column does not exist in the file.');
+      }
+
+      return validateContacts({
+        rows: parsed.rows,
+
+        phoneColumn: options.phoneColumn,
+
+        nameColumn: options.nameColumn ?? null,
+      });
+    },
+  );
+
+  /* -------------------------------------------------------
+     SAVE CONTACT IMPORT
+     ------------------------------------------------------- */
+
+  ipcMain.handle(
+    'imports:save',
+    (
+      _event,
+
+      options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+
+        sourceNote?: string | null;
+      },
+    ) => {
+      const parsed = parseContactFile(options.filePath);
+
+      if (!parsed.columns.includes(options.phoneColumn)) {
+        throw new Error('Selected phone column does not exist in the file.');
+      }
+
+      if (options.nameColumn && !parsed.columns.includes(options.nameColumn)) {
+        throw new Error('Selected name column does not exist in the file.');
+      }
+
+      const validationResult = validateContacts({
+        rows: parsed.rows,
+
+        phoneColumn: options.phoneColumn,
+
+        nameColumn: options.nameColumn ?? null,
+      });
+
+      return saveValidatedImport({
+        filePath: options.filePath,
+
+        fileName: parsed.fileName,
+
+        fileType: parsed.fileType,
+
+        validationResult,
+
+        sourceNote: options.sourceNote ?? null,
+      });
+    },
+  );
+
+  /* -------------------------------------------------------
+     DELETE SAVED IMPORT
+     ------------------------------------------------------- */
+
+  ipcMain.handle('imports:delete', (_event, importId: string) => {
+    return deleteSavedImport(importId);
+  });
+
+  /* -------------------------------------------------------
+     APP VERSION
+     ------------------------------------------------------- */
 
   ipcMain.handle('app:get-version', () => app.getVersion());
+
+  /* -------------------------------------------------------
+     CREATE WINDOW
+     ------------------------------------------------------- */
 
   createWindow();
 
@@ -133,6 +299,10 @@ app.whenReady().then(() => {
     }
   });
 });
+
+/* =========================================================
+   APP CLOSE EVENTS
+   ========================================================= */
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
