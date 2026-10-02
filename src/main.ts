@@ -1,34 +1,18 @@
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-} from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
 import path from 'node:path';
 
 import started from 'electron-squirrel-startup';
 
-import {
-  closeDatabase,
-  initializeDatabase,
-} from './db/database';
+import { closeDatabase, initializeDatabase } from './db/database';
 
-import {
-  getDatabaseHealth,
-} from './db/health';
+import { getDatabaseHealth } from './db/health';
 
-import {
-  detectContactColumns,
-} from './services/imports/column-detector';
+import { detectContactColumns } from './services/imports/column-detector';
 
-import {
-  validateContacts,
-} from './services/imports/contact-validator';
+import { validateContacts } from './services/imports/contact-validator';
 
-import {
-  parseContactFile,
-} from './services/imports/file-parser';
+import { parseContactFile } from './services/imports/file-parser';
 
 import {
   deleteSavedImport,
@@ -53,40 +37,30 @@ if (started) {
    ========================================================= */
 
 const createWindow = (): void => {
-  const mainWindow =
-    new BrowserWindow({
-      width: 1360,
-      height: 860,
+  const mainWindow = new BrowserWindow({
+    width: 1360,
+    height: 860,
 
-      minWidth: 1100,
-      minHeight: 700,
+    minWidth: 1100,
+    minHeight: 700,
 
-      show: false,
+    show: false,
 
-      backgroundColor:
-        '#f8fafc',
+    backgroundColor: '#f8fafc',
 
-      webPreferences: {
-        preload:
-          path.join(
-            __dirname,
-            'preload.cjs',
-          ),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
 
-        contextIsolation: true,
+      contextIsolation: true,
 
-        nodeIntegration: false,
+      nodeIntegration: false,
 
-        sandbox: true,
-      },
-    });
+      sandbox: true,
+    },
+  });
 
-  if (
-    MAIN_WINDOW_VITE_DEV_SERVER_URL
-  ) {
-    void mainWindow.loadURL(
-      MAIN_WINDOW_VITE_DEV_SERVER_URL,
-    );
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
     void mainWindow.loadFile(
       path.join(
@@ -97,12 +71,9 @@ const createWindow = (): void => {
     );
   }
 
-  mainWindow.once(
-    'ready-to-show',
-    () => {
-      mainWindow.show();
-    },
-  );
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
 };
 
 /* =========================================================
@@ -120,164 +91,99 @@ app.whenReady().then(() => {
      DATABASE HEALTH
      ------------------------------------------------------- */
 
-  ipcMain.handle(
-    'database:get-health',
-    () => {
-      console.log(
-        '[IPC] database:get-health called',
-      );
+  ipcMain.handle('database:get-health', () => {
+    console.log('[IPC] database:get-health called');
 
-      const result =
-        getDatabaseHealth();
+    const result = getDatabaseHealth();
 
-      console.log(
-        '[IPC] database health result:',
-        result,
-      );
+    console.log('[IPC] database health result:', result);
 
-      return result;
-    },
-  );
+    return result;
+  });
 
   /* -------------------------------------------------------
      CHOOSE CONTACT FILE
      ------------------------------------------------------- */
 
-  ipcMain.handle(
-    'imports:choose-file',
-    async () => {
-      const result =
-        await dialog.showOpenDialog({
-          title:
-            'Choose Contact File',
+  ipcMain.handle('imports:choose-file', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose Contact File',
 
-          properties: [
-            'openFile',
-          ],
+      properties: ['openFile'],
 
-          filters: [
-            {
-              name:
-                'Contact Files',
+      filters: [
+        {
+          name: 'Contact Files',
 
-              extensions: [
-                'csv',
-                'md',
-                'xlsx',
-                'xls',
-              ],
-            },
-          ],
-        });
+          extensions: ['csv', 'md', 'xlsx', 'xls'],
+        },
+      ],
+    });
 
-      if (
-        result.canceled ||
-        result.filePaths.length ===
-          0
-      ) {
-        return {
-          canceled: true,
-        };
-      }
-
-      const filePath =
-        result.filePaths[0];
-
-      const parsed =
-        parseContactFile(
-          filePath,
-        );
-
-      const detectedColumns =
-        detectContactColumns(
-          parsed.columns,
-          parsed.rows,
-        );
-
-      const validationResult =
-        detectedColumns.phoneColumn
-          ? validateContacts({
-              rows:
-                parsed.rows,
-
-              phoneColumn:
-                detectedColumns
-                  .phoneColumn,
-
-              nameColumn:
-                detectedColumns
-                  .nameColumn,
-            })
-          : null;
-
+    if (result.canceled || result.filePaths.length === 0) {
       return {
-        canceled: false,
-
-        filePath,
-
-        fileName:
-          parsed.fileName,
-
-        fileType:
-          parsed.fileType,
-
-        columns:
-          parsed.columns,
-
-        suggestedPhoneColumn:
-          detectedColumns
-            .phoneColumn,
-
-        suggestedNameColumn:
-          detectedColumns
-            .nameColumn,
-
-        sampleRows:
-          parsed.rows.slice(
-            0,
-            5,
-          ),
-
-        validationResult,
+        canceled: true,
       };
-    },
-  );
+    }
+
+    const filePath = result.filePaths[0];
+
+    const parsed = parseContactFile(filePath);
+
+    const detectedColumns = detectContactColumns(parsed.columns, parsed.rows);
+
+    const validationResult = detectedColumns.phoneColumn
+      ? validateContacts({
+          rows: parsed.rows,
+
+          phoneColumn: detectedColumns.phoneColumn,
+
+          nameColumn: detectedColumns.nameColumn,
+        })
+      : null;
+
+    return {
+      canceled: false,
+
+      filePath,
+
+      fileName: parsed.fileName,
+
+      fileType: parsed.fileType,
+
+      columns: parsed.columns,
+
+      suggestedPhoneColumn: detectedColumns.phoneColumn,
+
+      suggestedNameColumn: detectedColumns.nameColumn,
+
+      sampleRows: parsed.rows.slice(0, 5),
+
+      validationResult,
+    };
+  });
 
   /* -------------------------------------------------------
      LIST SAVED IMPORTS
      ------------------------------------------------------- */
 
-  ipcMain.handle(
-    'imports:list',
-    () => {
-      return listSavedImports();
-    },
-  );
+  ipcMain.handle('imports:list', () => {
+    return listSavedImports();
+  });
 
   /* -------------------------------------------------------
      GET SAVED IMPORT DETAILS
      ------------------------------------------------------- */
 
-  ipcMain.handle(
-    'imports:get-details',
-    (
-      _event,
-      importId: string,
-    ) => {
-      const result =
-        getSavedImportDetails(
-          importId,
-        );
+  ipcMain.handle('imports:get-details', (_event, importId: string) => {
+    const result = getSavedImportDetails(importId);
 
-      if (!result) {
-        throw new Error(
-          'Saved import was not found.',
-        );
-      }
+    if (!result) {
+      throw new Error('Saved import was not found.');
+    }
 
-      return result;
-    },
-  );
+    return result;
+  });
 
   /* -------------------------------------------------------
      VALIDATE CONTACT FILE
@@ -293,47 +199,25 @@ app.whenReady().then(() => {
 
         phoneColumn: string;
 
-        nameColumn?:
-          | string
-          | null;
+        nameColumn?: string | null;
       },
     ) => {
-      const parsed =
-        parseContactFile(
-          options.filePath,
-        );
+      const parsed = parseContactFile(options.filePath);
 
-      if (
-        !parsed.columns.includes(
-          options.phoneColumn,
-        )
-      ) {
-        throw new Error(
-          'Selected phone column does not exist in the file.',
-        );
+      if (!parsed.columns.includes(options.phoneColumn)) {
+        throw new Error('Selected phone column does not exist in the file.');
       }
 
-      if (
-        options.nameColumn &&
-        !parsed.columns.includes(
-          options.nameColumn,
-        )
-      ) {
-        throw new Error(
-          'Selected name column does not exist in the file.',
-        );
+      if (options.nameColumn && !parsed.columns.includes(options.nameColumn)) {
+        throw new Error('Selected name column does not exist in the file.');
       }
 
       return validateContacts({
-        rows:
-          parsed.rows,
+        rows: parsed.rows,
 
-        phoneColumn:
-          options.phoneColumn,
+        phoneColumn: options.phoneColumn,
 
-        nameColumn:
-          options.nameColumn ??
-          null,
+        nameColumn: options.nameColumn ?? null,
       });
     },
   );
@@ -352,69 +236,39 @@ app.whenReady().then(() => {
 
         phoneColumn: string;
 
-        nameColumn?:
-          | string
-          | null;
+        nameColumn?: string | null;
 
-        sourceNote?:
-          | string
-          | null;
+        sourceNote?: string | null;
       },
     ) => {
-      const parsed =
-        parseContactFile(
-          options.filePath,
-        );
+      const parsed = parseContactFile(options.filePath);
 
-      if (
-        !parsed.columns.includes(
-          options.phoneColumn,
-        )
-      ) {
-        throw new Error(
-          'Selected phone column does not exist in the file.',
-        );
+      if (!parsed.columns.includes(options.phoneColumn)) {
+        throw new Error('Selected phone column does not exist in the file.');
       }
 
-      if (
-        options.nameColumn &&
-        !parsed.columns.includes(
-          options.nameColumn,
-        )
-      ) {
-        throw new Error(
-          'Selected name column does not exist in the file.',
-        );
+      if (options.nameColumn && !parsed.columns.includes(options.nameColumn)) {
+        throw new Error('Selected name column does not exist in the file.');
       }
 
-      const validationResult =
-        validateContacts({
-          rows:
-            parsed.rows,
+      const validationResult = validateContacts({
+        rows: parsed.rows,
 
-          phoneColumn:
-            options.phoneColumn,
+        phoneColumn: options.phoneColumn,
 
-          nameColumn:
-            options.nameColumn ??
-            null,
-        });
+        nameColumn: options.nameColumn ?? null,
+      });
 
       return saveValidatedImport({
-        filePath:
-          options.filePath,
+        filePath: options.filePath,
 
-        fileName:
-          parsed.fileName,
+        fileName: parsed.fileName,
 
-        fileType:
-          parsed.fileType,
+        fileType: parsed.fileType,
 
         validationResult,
 
-        sourceNote:
-          options.sourceNote ??
-          null,
+        sourceNote: options.sourceNote ?? null,
       });
     },
   );
@@ -423,26 +277,15 @@ app.whenReady().then(() => {
      DELETE SAVED IMPORT
      ------------------------------------------------------- */
 
-  ipcMain.handle(
-    'imports:delete',
-    (
-      _event,
-      importId: string,
-    ) => {
-      return deleteSavedImport(
-        importId,
-      );
-    },
-  );
+  ipcMain.handle('imports:delete', (_event, importId: string) => {
+    return deleteSavedImport(importId);
+  });
 
   /* -------------------------------------------------------
      APP VERSION
      ------------------------------------------------------- */
 
-  ipcMain.handle(
-    'app:get-version',
-    () => app.getVersion(),
-  );
+  ipcMain.handle('app:get-version', () => app.getVersion());
 
   /* -------------------------------------------------------
      CREATE WINDOW
@@ -450,39 +293,23 @@ app.whenReady().then(() => {
 
   createWindow();
 
-  app.on(
-    'activate',
-    () => {
-      if (
-        BrowserWindow
-          .getAllWindows()
-          .length === 0
-      ) {
-        createWindow();
-      }
-    },
-  );
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
 });
 
 /* =========================================================
    APP CLOSE EVENTS
    ========================================================= */
 
-app.on(
-  'window-all-closed',
-  () => {
-    if (
-      process.platform !==
-      'darwin'
-    ) {
-      app.quit();
-    }
-  },
-);
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
 
-app.on(
-  'before-quit',
-  () => {
-    closeDatabase();
-  },
-);
+app.on('before-quit', () => {
+  closeDatabase();
+});

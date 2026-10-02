@@ -1,9 +1,6 @@
 import fs from 'node:fs';
 
-import {
-  createHash,
-  randomUUID,
-} from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export type SavedImportListItem = {
   id: string;
@@ -45,13 +42,9 @@ export type DeleteSavedImportResult = {
   detachedCampaigns: number;
 };
 
-import {
-  getDatabase,
-} from '../../db/database';
+import { getDatabase } from '../../db/database';
 
-import type {
-  ContactValidationResult,
-} from '../../types/imports';
+import type { ContactValidationResult } from '../../types/imports';
 
 export type SaveImportOptions = {
   filePath: string;
@@ -60,8 +53,7 @@ export type SaveImportOptions = {
 
   fileType: string;
 
-  validationResult:
-    ContactValidationResult;
+  validationResult: ContactValidationResult;
 
   sourceNote?: string | null;
 };
@@ -82,15 +74,10 @@ export type SavedImportResult = {
    FILE HASH
    ========================================================= */
 
-function createFileHash(
-  filePath: string,
-): string {
-  const fileBuffer =
-    fs.readFileSync(filePath);
+function createFileHash(filePath: string): string {
+  const fileBuffer = fs.readFileSync(filePath);
 
-  return createHash('sha256')
-    .update(fileBuffer)
-    .digest('hex');
+  return createHash('sha256').update(fileBuffer).digest('hex');
 }
 
 /* =========================================================
@@ -100,30 +87,18 @@ function createFileHash(
 export function saveValidatedImport(
   options: SaveImportOptions,
 ): SavedImportResult {
-  const db =
-    getDatabase();
+  const db = getDatabase();
 
-  const importId =
-    randomUUID();
+  const importId = randomUUID();
 
-  const now =
-    new Date().toISOString();
+  const now = new Date().toISOString();
 
-  const fileHash =
-    createFileHash(
-      options.filePath,
-    );
+  const fileHash = createFileHash(options.filePath);
 
-  const {
-    totalRows,
-    validRows,
-    invalidRows,
-    duplicateRows,
-  } =
+  const { totalRows, validRows, invalidRows, duplicateRows } =
     options.validationResult.summary;
 
-  const insertImport =
-    db.prepare(`
+  const insertImport = db.prepare(`
       INSERT INTO imports (
         id,
         filename,
@@ -152,8 +127,7 @@ export function saveValidatedImport(
       )
     `);
 
-  const insertContact =
-    db.prepare(`
+  const insertContact = db.prepare(`
       INSERT INTO import_contacts (
         id,
         import_id,
@@ -185,9 +159,7 @@ export function saveValidatedImport(
     `);
 
   try {
-    db.exec(
-      'BEGIN IMMEDIATE TRANSACTION;',
-    );
+    db.exec('BEGIN IMMEDIATE TRANSACTION;');
 
     insertImport.run(
       importId,
@@ -202,17 +174,13 @@ export function saveValidatedImport(
       duplicateRows,
     );
 
-    for (
-      const contact of
-        options.validationResult.contacts
-    ) {
+    for (const contact of options.validationResult.contacts) {
       insertContact.run(
         randomUUID(),
 
         importId,
 
-        contact.name ||
-          null,
+        contact.name || null,
 
         contact.originalPhone,
 
@@ -222,16 +190,11 @@ export function saveValidatedImport(
 
         contact.reason,
 
-        contact.status ===
-          'duplicate'
-          ? 1
-          : 0,
+        contact.status === 'duplicate' ? 1 : 0,
 
         contact.rowNumber,
 
-        JSON.stringify(
-          contact.sourceRow,
-        ),
+        JSON.stringify(contact.sourceRow),
 
         now,
       );
@@ -261,13 +224,10 @@ export function saveValidatedImport(
   };
 }
 
-export function listSavedImports():
-  SavedImportListItem[] {
-  const db =
-    getDatabase();
+export function listSavedImports(): SavedImportListItem[] {
+  const db = getDatabase();
 
-  const statement =
-    db.prepare(`
+  const statement = db.prepare(`
       SELECT
         id,
         filename,
@@ -281,53 +241,41 @@ export function listSavedImports():
       ORDER BY imported_at DESC
     `);
 
-  const rows =
-    statement.all() as Array<{
-      id: string;
-      filename: string;
-      file_type: string;
-      imported_at: string;
-      total_rows: number;
-      valid_rows: number;
-      invalid_rows: number;
-      duplicate_rows: number;
-    }>;
+  const rows = statement.all() as Array<{
+    id: string;
+    filename: string;
+    file_type: string;
+    imported_at: string;
+    total_rows: number;
+    valid_rows: number;
+    invalid_rows: number;
+    duplicate_rows: number;
+  }>;
 
-  return rows.map(
-    (row) => ({
-      id: row.id,
+  return rows.map((row) => ({
+    id: row.id,
 
-      filename:
-        row.filename,
+    filename: row.filename,
 
-      fileType:
-        row.file_type,
+    fileType: row.file_type,
 
-      importedAt:
-        row.imported_at,
+    importedAt: row.imported_at,
 
-      totalRows:
-        row.total_rows,
+    totalRows: row.total_rows,
 
-      validRows:
-        row.valid_rows,
+    validRows: row.valid_rows,
 
-      invalidRows:
-        row.invalid_rows,
+    invalidRows: row.invalid_rows,
 
-      duplicateRows:
-        row.duplicate_rows,
-    }),
-  );
+    duplicateRows: row.duplicate_rows,
+  }));
 }
 export function getSavedImportDetails(
   importId: string,
 ): SavedImportDetails | null {
-  const db =
-    getDatabase();
+  const db = getDatabase();
 
-  const importStatement =
-    db.prepare(`
+  const importStatement = db.prepare(`
       SELECT
         id,
         filename,
@@ -342,28 +290,24 @@ export function getSavedImportDetails(
       LIMIT 1
     `);
 
-  const importRow =
-    importStatement.get(
-      importId,
-    ) as
-      | {
-          id: string;
-          filename: string;
-          file_type: string;
-          imported_at: string;
-          total_rows: number;
-          valid_rows: number;
-          invalid_rows: number;
-          duplicate_rows: number;
-        }
-      | undefined;
+  const importRow = importStatement.get(importId) as
+    | {
+        id: string;
+        filename: string;
+        file_type: string;
+        imported_at: string;
+        total_rows: number;
+        valid_rows: number;
+        invalid_rows: number;
+        duplicate_rows: number;
+      }
+    | undefined;
 
   if (!importRow) {
     return null;
   }
 
-  const contactStatement =
-    db.prepare(`
+  const contactStatement = db.prepare(`
       SELECT
         id,
         name,
@@ -378,144 +322,100 @@ export function getSavedImportDetails(
       ORDER BY row_number ASC
     `);
 
-  const contactRows =
-    contactStatement.all(
-      importId,
-    ) as Array<{
-      id: string;
-      name: string | null;
-      original_phone: string;
-      normalized_phone:
-        | string
-        | null;
-      validation_status: string;
-      validation_reason:
-        | string
-        | null;
-      is_duplicate: number;
-      row_number:
-        | number
-        | null;
-    }>;
+  const contactRows = contactStatement.all(importId) as Array<{
+    id: string;
+    name: string | null;
+    original_phone: string;
+    normalized_phone: string | null;
+    validation_status: string;
+    validation_reason: string | null;
+    is_duplicate: number;
+    row_number: number | null;
+  }>;
 
   return {
-    id:
-      importRow.id,
+    id: importRow.id,
 
-    filename:
-      importRow.filename,
+    filename: importRow.filename,
 
-    fileType:
-      importRow.file_type,
+    fileType: importRow.file_type,
 
-    importedAt:
-      importRow.imported_at,
+    importedAt: importRow.imported_at,
 
-    totalRows:
-      importRow.total_rows,
+    totalRows: importRow.total_rows,
 
-    validRows:
-      importRow.valid_rows,
+    validRows: importRow.valid_rows,
 
-    invalidRows:
-      importRow.invalid_rows,
+    invalidRows: importRow.invalid_rows,
 
-    duplicateRows:
-      importRow.duplicate_rows,
+    duplicateRows: importRow.duplicate_rows,
 
-    contacts:
-      contactRows.map(
-        (row) => ({
-          id:
-            row.id,
+    contacts: contactRows.map((row) => ({
+      id: row.id,
 
-          name:
-            row.name ?? '',
+      name: row.name ?? '',
 
-          originalPhone:
-            row.original_phone,
+      originalPhone: row.original_phone,
 
-          normalizedPhone:
-            row.normalized_phone,
+      normalizedPhone: row.normalized_phone,
 
-          validationStatus:
-            row.validation_status,
+      validationStatus: row.validation_status,
 
-          validationReason:
-            row.validation_reason,
+      validationReason: row.validation_reason,
 
-          isDuplicate:
-            row.is_duplicate === 1,
+      isDuplicate: row.is_duplicate === 1,
 
-          rowNumber:
-            row.row_number,
-        }),
-      ),
+      rowNumber: row.row_number,
+    })),
   };
 }
 
-export function deleteSavedImport(
-  importId: string,
-): DeleteSavedImportResult {
-  const db =
-    getDatabase();
+export function deleteSavedImport(importId: string): DeleteSavedImportResult {
+  const db = getDatabase();
 
-  const existingImport =
-    db.prepare(`
+  const existingImport = db
+    .prepare(`
       SELECT id
       FROM imports
       WHERE id = ?
       LIMIT 1
-    `).get(
-      importId,
-    ) as
-      | {
-          id: string;
-        }
-      | undefined;
+    `)
+    .get(importId) as
+    | {
+        id: string;
+      }
+    | undefined;
 
   if (!existingImport) {
-    throw new Error(
-      'Saved import was not found.',
-    );
+    throw new Error('Saved import was not found.');
   }
 
-  const contactCountRow =
-    db.prepare(`
+  const contactCountRow = db
+    .prepare(`
       SELECT COUNT(*) AS count
       FROM import_contacts
       WHERE import_id = ?
-    `).get(
-      importId,
-    ) as {
-      count: number;
-    };
+    `)
+    .get(importId) as {
+    count: number;
+  };
 
-  const campaignCountRow =
-    db.prepare(`
+  const campaignCountRow = db
+    .prepare(`
       SELECT COUNT(*) AS count
       FROM campaigns
       WHERE import_id = ?
-    `).get(
-      importId,
-    ) as {
-      count: number;
-    };
+    `)
+    .get(importId) as {
+    count: number;
+  };
 
-  const deletedContacts =
-    Number(
-      contactCountRow.count,
-    );
+  const deletedContacts = Number(contactCountRow.count);
 
-  const detachedCampaigns =
-    Number(
-      campaignCountRow.count,
-    );
+  const detachedCampaigns = Number(campaignCountRow.count);
 
   try {
-    db.exec(
-      'BEGIN IMMEDIATE TRANSACTION;',
-    );
+    db.exec('BEGIN IMMEDIATE TRANSACTION;');
 
     /*
      * Because of the database foreign keys:
@@ -532,9 +432,7 @@ export function deleteSavedImport(
     db.prepare(`
       DELETE FROM imports
       WHERE id = ?
-    `).run(
-      importId,
-    );
+    `).run(importId);
 
     db.exec('COMMIT;');
   } catch (error) {

@@ -9,18 +9,11 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
-import {
-  PageHeader,
-} from '../components/PageHeader';
+import { PageHeader } from '../components/PageHeader';
 
-import type {
-  ContactFileInspection,
-} from '../types/imports';
+import type { ContactFileInspection } from '../types/imports';
 
 /* =========================================================
    TYPES
@@ -52,21 +45,15 @@ type SavedImportDetails = {
     name: string;
     originalPhone: string;
 
-    normalizedPhone:
-      | string
-      | null;
+    normalizedPhone: string | null;
 
     validationStatus: string;
 
-    validationReason:
-      | string
-      | null;
+    validationReason: string | null;
 
     isDuplicate: boolean;
 
-    rowNumber:
-      | number
-      | null;
+    rowNumber: number | null;
   }>;
 };
 
@@ -75,127 +62,47 @@ type SavedImportDetails = {
    ========================================================= */
 
 export function ImportContactsPage() {
-  const [
-    selectedFile,
-    setSelectedFile,
-  ] =
-    useState<ContactFileInspection | null>(
-      null,
-    );
+  const [selectedFile, setSelectedFile] =
+    useState<ContactFileInspection | null>(null);
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [
-    error,
-    setError,
-  ] =
-    useState<string | null>(
-      null,
-    );
+  const [error, setError] = useState<string | null>(null);
 
-  const [
-    selectedPhoneColumn,
-    setSelectedPhoneColumn,
-  ] =
-    useState('');
+  const [selectedPhoneColumn, setSelectedPhoneColumn] = useState('');
 
-  const [
-    selectedNameColumn,
-    setSelectedNameColumn,
-  ] =
-    useState('');
+  const [selectedNameColumn, setSelectedNameColumn] = useState('');
 
-  const [
-    validation,
-    setValidation,
-  ] =
-    useState<
-      ContactFileInspection[
-        'validationResult'
-      ]
-    >(null);
+  const [validation, setValidation] =
+    useState<ContactFileInspection['validationResult']>(null);
 
-  const [
-    saving,
-    setSaving,
-  ] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [
-    savedImportId,
-    setSavedImportId,
-  ] =
-    useState<string | null>(
-      null,
-    );
+  const [savedImportId, setSavedImportId] = useState<string | null>(null);
 
-  const [
-    saveMessage,
-    setSaveMessage,
-  ] =
-    useState<string | null>(
-      null,
-    );
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const [
-    savedImports,
-    setSavedImports,
-  ] =
-    useState<
-      SavedImportItem[]
-    >([]);
+  const [savedImports, setSavedImports] = useState<SavedImportItem[]>([]);
 
-  const [
-    loadingSavedImports,
-    setLoadingSavedImports,
-  ] =
-    useState(false);
+  const [loadingSavedImports, setLoadingSavedImports] = useState(false);
 
-  const [
-    selectedSavedImport,
-    setSelectedSavedImport,
-  ] =
-    useState<
-      SavedImportDetails | null
-    >(null);
+  const [selectedSavedImport, setSelectedSavedImport] =
+    useState<SavedImportDetails | null>(null);
 
-  const [
-    loadingSavedImportDetails,
-    setLoadingSavedImportDetails,
-  ] =
+  const [loadingSavedImportDetails, setLoadingSavedImportDetails] =
     useState(false);
 
   /* =========================================================
      DELETE STATE
      ========================================================= */
 
-  const [
-    deleteTarget,
-    setDeleteTarget,
-  ] =
-    useState<SavedImportItem | null>(
-      null,
-    );
+  const [deleteTarget, setDeleteTarget] = useState<SavedImportItem | null>(
+    null,
+  );
 
-  const [
-    deletingImportId,
-    setDeletingImportId,
-  ] =
-    useState<string | null>(
-      null,
-    );
+  const [deletingImportId, setDeletingImportId] = useState<string | null>(null);
 
-  const [
-    deleteMessage,
-    setDeleteMessage,
-  ] =
-    useState<string | null>(
-      null,
-    );
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
 
   /* =========================================================
      LOAD SAVED IMPORTS
@@ -203,26 +110,15 @@ export function ImportContactsPage() {
 
   async function loadSavedImports() {
     try {
-      setLoadingSavedImports(
-        true,
-      );
+      setLoadingSavedImports(true);
 
-      const imports =
-        await window.appAPI
-          .listSavedImports();
+      const imports = await window.appAPI.listSavedImports();
 
-      setSavedImports(
-        imports,
-      );
+      setSavedImports(imports);
     } catch (err) {
-      console.error(
-        'Unable to load saved imports:',
-        err,
-      );
+      console.error('Unable to load saved imports:', err);
     } finally {
-      setLoadingSavedImports(
-        false,
-      );
+      setLoadingSavedImports(false);
     }
   }
 
@@ -230,31 +126,19 @@ export function ImportContactsPage() {
      VIEW SAVED IMPORT
      ========================================================= */
 
-  async function viewSavedImport(
-    importId: string,
-  ) {
+  async function viewSavedImport(importId: string) {
     try {
-      setLoadingSavedImportDetails(
-        true,
-      );
+      setLoadingSavedImportDetails(true);
 
       setError(null);
 
-      const result =
-        await window.appAPI
-          .getSavedImportDetails(
-            importId,
-          );
+      const result = await window.appAPI.getSavedImportDetails(importId);
 
-      setSelectedSavedImport(
-        result,
-      );
+      setSelectedSavedImport(result);
     } catch (err) {
       console.error(err);
 
-      setSelectedSavedImport(
-        null,
-      );
+      setSelectedSavedImport(null);
 
       setError(
         err instanceof Error
@@ -262,9 +146,7 @@ export function ImportContactsPage() {
           : 'Unable to load saved import details.',
       );
     } finally {
-      setLoadingSavedImportDetails(
-        false,
-      );
+      setLoadingSavedImportDetails(false);
     }
   }
 
@@ -272,16 +154,10 @@ export function ImportContactsPage() {
      REQUEST DELETE
      ========================================================= */
 
-  function requestDeleteImport(
-    savedImport: SavedImportItem,
-  ) {
-    setDeleteMessage(
-      null,
-    );
+  function requestDeleteImport(savedImport: SavedImportItem) {
+    setDeleteMessage(null);
 
-    setDeleteTarget(
-      savedImport,
-    );
+    setDeleteTarget(savedImport);
   }
 
   /* =========================================================
@@ -294,30 +170,19 @@ export function ImportContactsPage() {
     }
 
     try {
-      setDeletingImportId(
-        deleteTarget.id,
-      );
+      setDeletingImportId(deleteTarget.id);
 
       setError(null);
       setDeleteMessage(null);
 
-      const result =
-        await window.appAPI
-          .deleteSavedImport(
-            deleteTarget.id,
-          );
+      const result = await window.appAPI.deleteSavedImport(deleteTarget.id);
 
       /*
        * Close details if the deleted
        * import is currently being viewed.
        */
-      if (
-        selectedSavedImport?.id ===
-        deleteTarget.id
-      ) {
-        setSelectedSavedImport(
-          null,
-        );
+      if (selectedSavedImport?.id === deleteTarget.id) {
+        setSelectedSavedImport(null);
       }
 
       /*
@@ -325,17 +190,10 @@ export function ImportContactsPage() {
        * is deleted, allow it to be saved
        * again.
        */
-      if (
-        savedImportId ===
-        deleteTarget.id
-      ) {
-        setSavedImportId(
-          null,
-        );
+      if (savedImportId === deleteTarget.id) {
+        setSavedImportId(null);
 
-        setSaveMessage(
-          null,
-        );
+        setSaveMessage(null);
       }
 
       const contactText =
@@ -354,9 +212,7 @@ export function ImportContactsPage() {
         `Import deleted successfully. ${contactText}${campaignText}`,
       );
 
-      setDeleteTarget(
-        null,
-      );
+      setDeleteTarget(null);
 
       await loadSavedImports();
     } catch (err) {
@@ -368,9 +224,7 @@ export function ImportContactsPage() {
           : 'Unable to delete the saved import.',
       );
     } finally {
-      setDeletingImportId(
-        null,
-      );
+      setDeletingImportId(null);
     }
   }
 
@@ -392,72 +246,39 @@ export function ImportContactsPage() {
 
       setError(null);
 
-      setSavedImportId(
-        null,
-      );
+      setSavedImportId(null);
 
-      setSaveMessage(
-        null,
-      );
+      setSaveMessage(null);
 
-      setDeleteMessage(
-        null,
-      );
+      setDeleteMessage(null);
 
-      const result =
-        await window.appAPI
-          .chooseContactFile();
+      const result = await window.appAPI.chooseContactFile();
 
       if (result.canceled) {
         return;
       }
 
-      setSelectedFile(
-        result,
-      );
+      setSelectedFile(result);
 
-      setSelectedPhoneColumn(
-        result
-          .suggestedPhoneColumn ??
-          '',
-      );
+      setSelectedPhoneColumn(result.suggestedPhoneColumn ?? '');
 
-      setSelectedNameColumn(
-        result
-          .suggestedNameColumn ??
-          '',
-      );
+      setSelectedNameColumn(result.suggestedNameColumn ?? '');
 
-      setValidation(
-        result.validationResult ??
-          null,
-      );
+      setValidation(result.validationResult ?? null);
     } catch (err) {
       console.error(err);
 
-      setSelectedFile(
-        null,
-      );
+      setSelectedFile(null);
 
-      setSelectedPhoneColumn(
-        '',
-      );
+      setSelectedPhoneColumn('');
 
-      setSelectedNameColumn(
-        '',
-      );
+      setSelectedNameColumn('');
 
-      setValidation(
-        null,
-      );
+      setValidation(null);
 
-      setSavedImportId(
-        null,
-      );
+      setSavedImportId(null);
 
-      setSaveMessage(
-        null,
-      );
+      setSaveMessage(null);
 
       setError(
         err instanceof Error
@@ -473,26 +294,13 @@ export function ImportContactsPage() {
      REVALIDATE FILE
      ========================================================= */
 
-  async function revalidateFile(
-    phoneColumn: string,
-    nameColumn: string,
-  ) {
-    setSavedImportId(
-      null,
-    );
+  async function revalidateFile(phoneColumn: string, nameColumn: string) {
+    setSavedImportId(null);
 
-    setSaveMessage(
-      null,
-    );
+    setSaveMessage(null);
 
-    if (
-      !selectedFile
-        ?.filePath ||
-      !phoneColumn
-    ) {
-      setValidation(
-        null,
-      );
+    if (!selectedFile?.filePath || !phoneColumn) {
+      setValidation(null);
 
       return;
     }
@@ -500,29 +308,19 @@ export function ImportContactsPage() {
     try {
       setError(null);
 
-      const result =
-        await window.appAPI
-          .validateContactFile({
-            filePath:
-              selectedFile
-                .filePath,
+      const result = await window.appAPI.validateContactFile({
+        filePath: selectedFile.filePath,
 
-            phoneColumn,
+        phoneColumn,
 
-            nameColumn:
-              nameColumn ||
-              null,
-          });
+        nameColumn: nameColumn || null,
+      });
 
-      setValidation(
-        result,
-      );
+      setValidation(result);
     } catch (err) {
       console.error(err);
 
-      setValidation(
-        null,
-      );
+      setValidation(null);
 
       setError(
         err instanceof Error
@@ -537,12 +335,7 @@ export function ImportContactsPage() {
      ========================================================= */
 
   async function saveImport() {
-    if (
-      !selectedFile
-        ?.filePath ||
-      !selectedPhoneColumn ||
-      !validation
-    ) {
+    if (!selectedFile?.filePath || !selectedPhoneColumn || !validation) {
       return;
     }
 
@@ -553,24 +346,15 @@ export function ImportContactsPage() {
       setSaveMessage(null);
       setDeleteMessage(null);
 
-      const result =
-        await window.appAPI
-          .saveContactImport({
-            filePath:
-              selectedFile
-                .filePath,
+      const result = await window.appAPI.saveContactImport({
+        filePath: selectedFile.filePath,
 
-            phoneColumn:
-              selectedPhoneColumn,
+        phoneColumn: selectedPhoneColumn,
 
-            nameColumn:
-              selectedNameColumn ||
-              null,
-          });
+        nameColumn: selectedNameColumn || null,
+      });
 
-      setSavedImportId(
-        result.importId,
-      );
+      setSavedImportId(result.importId);
 
       await loadSavedImports();
 
@@ -613,14 +397,9 @@ export function ImportContactsPage() {
 
       {deleteMessage && (
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          <CheckCircle2
-            className="mt-0.5 shrink-0"
-            size={18}
-          />
+          <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
 
-          <span>
-            {deleteMessage}
-          </span>
+          <span>{deleteMessage}</span>
         </div>
       )}
 
@@ -637,21 +416,14 @@ export function ImportContactsPage() {
               </h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                Previously imported
-                participant lists stored
-                locally in this
+                Previously imported participant lists stored locally in this
                 application.
               </p>
             </div>
 
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {
-                savedImports.length
-              }{' '}
-              {savedImports.length ===
-              1
-                ? 'Import'
-                : 'Imports'}
+              {savedImports.length}{' '}
+              {savedImports.length === 1 ? 'Import' : 'Imports'}
             </span>
           </div>
         </div>
@@ -660,11 +432,9 @@ export function ImportContactsPage() {
           <div className="p-6 text-sm text-slate-500">
             Loading saved imports...
           </div>
-        ) : savedImports.length ===
-          0 ? (
+        ) : savedImports.length === 0 ? (
           <div className="p-6 text-sm text-slate-500">
-            No contact imports have
-            been saved yet.
+            No contact imports have been saved yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -706,116 +476,66 @@ export function ImportContactsPage() {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {savedImports.map(
-                  (
-                    savedImport,
-                  ) => {
-                    const isDeleting =
-                      deletingImportId ===
-                      savedImport.id;
+                {savedImports.map((savedImport) => {
+                  const isDeleting = deletingImportId === savedImport.id;
 
-                    return (
-                      <tr
-                        key={
-                          savedImport.id
-                        }
-                      >
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
-                          {
-                            savedImport.filename
-                          }
-                        </td>
+                  return (
+                    <tr key={savedImport.id}>
+                      <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                        {savedImport.filename}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 uppercase text-slate-500">
-                          {
-                            savedImport.fileType
-                          }
-                        </td>
+                      <td className="whitespace-nowrap px-5 py-3 uppercase text-slate-500">
+                        {savedImport.fileType}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-500">
-                          {new Date(
-                            savedImport
-                              .importedAt,
-                          ).toLocaleString()}
-                        </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-slate-500">
+                        {new Date(savedImport.importedAt).toLocaleString()}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-700">
-                          {
-                            savedImport.totalRows
-                          }
-                        </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-slate-700">
+                        {savedImport.totalRows}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 font-semibold text-emerald-700">
-                          {
-                            savedImport.validRows
-                          }
-                        </td>
+                      <td className="whitespace-nowrap px-5 py-3 font-semibold text-emerald-700">
+                        {savedImport.validRows}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 font-semibold text-red-700">
-                          {
-                            savedImport.invalidRows
-                          }
-                        </td>
+                      <td className="whitespace-nowrap px-5 py-3 font-semibold text-red-700">
+                        {savedImport.invalidRows}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3 font-semibold text-amber-700">
-                          {
-                            savedImport
-                              .duplicateRows
-                          }
-                        </td>
+                      <td className="whitespace-nowrap px-5 py-3 font-semibold text-amber-700">
+                        {savedImport.duplicateRows}
+                      </td>
 
-                        <td className="whitespace-nowrap px-5 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void viewSavedImport(
-                                  savedImport.id,
-                                )
-                              }
-                              disabled={
-                                isDeleting ||
-                                loadingSavedImportDetails
-                              }
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <Eye
-                                size={
-                                  15
-                                }
-                              />
+                      <td className="whitespace-nowrap px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void viewSavedImport(savedImport.id)}
+                            disabled={isDeleting || loadingSavedImportDetails}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Eye size={15} />
+                            View
+                          </button>
 
-                              View
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => requestDeleteImport(savedImport)}
+                            disabled={isDeleting}
+                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 size={15} />
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                requestDeleteImport(
-                                  savedImport,
-                                )
-                              }
-                              disabled={
-                                isDeleting
-                              }
-                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <Trash2
-                                size={
-                                  15
-                                }
-                              />
-
-                              {isDeleting
-                                ? 'Deleting...'
-                                : 'Delete'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  },
-                )}
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -828,222 +548,166 @@ export function ImportContactsPage() {
 
       {loadingSavedImportDetails && (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-          Loading saved import
-          details...
+          Loading saved import details...
         </div>
       )}
 
-      {selectedSavedImport &&
-        !loadingSavedImportDetails && (
-          <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {selectedSavedImport && !loadingSavedImportDetails && (
+        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* DETAILS HEADER */}
 
-            {/* DETAILS HEADER */}
+          <div className="flex flex-col gap-4 border-b border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">
+                Saved Import Details
+              </h3>
 
-            <div className="flex flex-col gap-4 border-b border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">
-                  Saved Import Details
-                </h3>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  {
-                    selectedSavedImport.filename
-                  }
-                  {' • '}
-                  {selectedSavedImport.fileType.toUpperCase()}
-                  {' • '}
-                  {new Date(
-                    selectedSavedImport.importedAt,
-                  ).toLocaleString()}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedSavedImport(
-                    null,
-                  )
-                }
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <X
-                  size={16}
-                />
-
-                Close Details
-              </button>
+              <p className="mt-1 text-sm text-slate-500">
+                {selectedSavedImport.filename}
+                {' • '}
+                {selectedSavedImport.fileType.toUpperCase()}
+                {' • '}
+                {new Date(selectedSavedImport.importedAt).toLocaleString()}
+              </p>
             </div>
 
-            {/* DETAILS SUMMARY */}
+            <button
+              type="button"
+              onClick={() => setSelectedSavedImport(null)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <X size={16} />
+              Close Details
+            </button>
+          </div>
 
-            <div className="grid gap-4 border-b border-slate-200 p-6 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Total Rows
-                </p>
+          {/* DETAILS SUMMARY */}
 
-                <p className="mt-2 text-xl font-bold text-slate-900">
-                  {
-                    selectedSavedImport.totalRows
-                  }
-                </p>
-              </div>
+          <div className="grid gap-4 border-b border-slate-200 p-6 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Total Rows
+              </p>
 
-              <div className="rounded-xl bg-emerald-50 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">
-                  Valid
-                </p>
-
-                <p className="mt-2 text-xl font-bold text-emerald-700">
-                  {
-                    selectedSavedImport.validRows
-                  }
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-red-50 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-red-600">
-                  Invalid
-                </p>
-
-                <p className="mt-2 text-xl font-bold text-red-700">
-                  {
-                    selectedSavedImport.invalidRows
-                  }
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-amber-50 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
-                  Duplicates
-                </p>
-
-                <p className="mt-2 text-xl font-bold text-amber-700">
-                  {
-                    selectedSavedImport.duplicateRows
-                  }
-                </p>
-              </div>
+              <p className="mt-2 text-xl font-bold text-slate-900">
+                {selectedSavedImport.totalRows}
+              </p>
             </div>
 
-            {/* DETAILS CONTACT TABLE */}
+            <div className="rounded-xl bg-emerald-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">
+                Valid
+              </p>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                      Row
-                    </th>
+              <p className="mt-2 text-xl font-bold text-emerald-700">
+                {selectedSavedImport.validRows}
+              </p>
+            </div>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                      Name
-                    </th>
+            <div className="rounded-xl bg-red-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-red-600">
+                Invalid
+              </p>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                      Original Phone
-                    </th>
+              <p className="mt-2 text-xl font-bold text-red-700">
+                {selectedSavedImport.invalidRows}
+              </p>
+            </div>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                      Normalized Phone
-                    </th>
+            <div className="rounded-xl bg-amber-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
+                Duplicates
+              </p>
 
-                    <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                      Status
-                    </th>
-
-                    <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                      Reason
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100">
-                  {selectedSavedImport.contacts.map(
-                    (
-                      contact,
-                    ) => (
-                      <tr
-                        key={
-                          contact.id
-                        }
-                      >
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-500">
-                          {
-                            contact.rowNumber ??
-                            '—'
-                          }
-                        </td>
-
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
-                          {contact.name ||
-                            '—'}
-                        </td>
-
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-700">
-                          {
-                            contact.originalPhone ||
-                            '—'
-                          }
-                        </td>
-
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
-                          {
-                            contact.normalizedPhone ??
-                            '—'
-                          }
-                        </td>
-
-                        <td className="px-5 py-3">
-                          {contact.validationStatus ===
-                            'valid' && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                              <CheckCircle2
-                                size={
-                                  14
-                                }
-                              />
-
-                              Valid
-                            </span>
-                          )}
-
-                          {contact.validationStatus ===
-                            'invalid' && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                              <XCircle
-                                size={
-                                  14
-                                }
-                              />
-
-                              Invalid
-                            </span>
-                          )}
-
-                          {contact.validationStatus ===
-                            'duplicate' && (
-                            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                              Duplicate
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="min-w-64 px-5 py-3 text-slate-500">
-                          {
-                            contact.validationReason ??
-                            '—'
-                          }
-                        </td>
-                      </tr>
-                    ),
-                  )}
-                </tbody>
-              </table>
+              <p className="mt-2 text-xl font-bold text-amber-700">
+                {selectedSavedImport.duplicateRows}
+              </p>
             </div>
           </div>
-        )}
+
+          {/* DETAILS CONTACT TABLE */}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                    Row
+                  </th>
+
+                  <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                    Name
+                  </th>
+
+                  <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                    Original Phone
+                  </th>
+
+                  <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                    Normalized Phone
+                  </th>
+
+                  <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                    Status
+                  </th>
+
+                  <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                    Reason
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {selectedSavedImport.contacts.map((contact) => (
+                  <tr key={contact.id}>
+                    <td className="whitespace-nowrap px-5 py-3 text-slate-500">
+                      {contact.rowNumber ?? '—'}
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                      {contact.name || '—'}
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-3 text-slate-700">
+                      {contact.originalPhone || '—'}
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                      {contact.normalizedPhone ?? '—'}
+                    </td>
+
+                    <td className="px-5 py-3">
+                      {contact.validationStatus === 'valid' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                          <CheckCircle2 size={14} />
+                          Valid
+                        </span>
+                      )}
+
+                      {contact.validationStatus === 'invalid' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                          <XCircle size={14} />
+                          Invalid
+                        </span>
+                      )}
+
+                      {contact.validationStatus === 'duplicate' && (
+                        <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          Duplicate
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="min-w-64 px-5 py-3 text-slate-500">
+                      {contact.validationReason ?? '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           FILE PICKER
@@ -1051,10 +715,7 @@ export function ImportContactsPage() {
 
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
-          <Upload
-            className="text-emerald-700"
-            size={24}
-          />
+          <Upload className="text-emerald-700" size={24} />
         </div>
 
         <h3 className="mt-5 text-lg font-semibold text-slate-900">
@@ -1062,27 +723,18 @@ export function ImportContactsPage() {
         </h3>
 
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-          Supported formats: CSV,
-          Markdown, XLSX and XLS.
+          Supported formats: CSV, Markdown, XLSX and XLS.
         </p>
 
         <button
           type="button"
-          onClick={
-            chooseFile
-          }
-          disabled={
-            loading
-          }
+          onClick={chooseFile}
+          disabled={loading}
           className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <FileSpreadsheet
-            size={18}
-          />
+          <FileSpreadsheet size={18} />
 
-          {loading
-            ? 'Opening...'
-            : 'Choose File'}
+          {loading ? 'Opening...' : 'Choose File'}
         </button>
       </div>
 
@@ -1092,7 +744,6 @@ export function ImportContactsPage() {
 
       {selectedFile && (
         <div className="mt-6 space-y-6">
-
           {/* FILE INFORMATION */}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1107,9 +758,7 @@ export function ImportContactsPage() {
                 </p>
 
                 <p className="mt-1 text-sm font-medium text-slate-800">
-                  {
-                    selectedFile.fileName
-                  }
+                  {selectedFile.fileName}
                 </p>
               </div>
 
@@ -1119,9 +768,7 @@ export function ImportContactsPage() {
                 </p>
 
                 <p className="mt-1 text-sm font-medium uppercase text-slate-800">
-                  {
-                    selectedFile.fileType
-                  }
+                  {selectedFile.fileType}
                 </p>
               </div>
             </div>
@@ -1135,14 +782,11 @@ export function ImportContactsPage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              The most likely columns
-              were selected
-              automatically. Change them
+              The most likely columns were selected automatically. Change them
               if needed.
             </p>
 
             <div className="mt-5 grid gap-5 md:grid-cols-2">
-
               {/* PHONE COLUMN */}
 
               <div>
@@ -1155,50 +799,23 @@ export function ImportContactsPage() {
 
                 <select
                   id="phone-column"
-                  value={
-                    selectedPhoneColumn
-                  }
-                  onChange={async (
-                    event,
-                  ) => {
-                    const value =
-                      event.target
-                        .value;
+                  value={selectedPhoneColumn}
+                  onChange={async (event) => {
+                    const value = event.target.value;
 
-                    setSelectedPhoneColumn(
-                      value,
-                    );
+                    setSelectedPhoneColumn(value);
 
-                    await revalidateFile(
-                      value,
-                      selectedNameColumn,
-                    );
+                    await revalidateFile(value, selectedNameColumn);
                   }}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 >
-                  <option value="">
-                    Select phone
-                    column
-                  </option>
+                  <option value="">Select phone column</option>
 
-                  {selectedFile.columns?.map(
-                    (
-                      column,
-                    ) => (
-                      <option
-                        key={
-                          column
-                        }
-                        value={
-                          column
-                        }
-                      >
-                        {
-                          column
-                        }
-                      </option>
-                    ),
-                  )}
+                  {selectedFile.columns?.map((column) => (
+                    <option key={column} value={column}>
+                      {column}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1214,49 +831,23 @@ export function ImportContactsPage() {
 
                 <select
                   id="name-column"
-                  value={
-                    selectedNameColumn
-                  }
-                  onChange={async (
-                    event,
-                  ) => {
-                    const value =
-                      event.target
-                        .value;
+                  value={selectedNameColumn}
+                  onChange={async (event) => {
+                    const value = event.target.value;
 
-                    setSelectedNameColumn(
-                      value,
-                    );
+                    setSelectedNameColumn(value);
 
-                    await revalidateFile(
-                      selectedPhoneColumn,
-                      value,
-                    );
+                    await revalidateFile(selectedPhoneColumn, value);
                   }}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 >
-                  <option value="">
-                    No name column
-                  </option>
+                  <option value="">No name column</option>
 
-                  {selectedFile.columns?.map(
-                    (
-                      column,
-                    ) => (
-                      <option
-                        key={
-                          column
-                        }
-                        value={
-                          column
-                        }
-                      >
-                        {
-                          column
-                        }
-                      </option>
-                    ),
-                  )}
+                  {selectedFile.columns?.map((column) => (
+                    <option key={column} value={column}>
+                      {column}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1269,22 +860,14 @@ export function ImportContactsPage() {
               </p>
 
               <div className="mt-2 flex flex-wrap gap-2">
-                {selectedFile.columns?.map(
-                  (
-                    column,
-                  ) => (
-                    <span
-                      key={
-                        column
-                      }
-                      className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                    >
-                      {
-                        column
-                      }
-                    </span>
-                  ),
-                )}
+                {selectedFile.columns?.map((column) => (
+                  <span
+                    key={column}
+                    className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                  >
+                    {column}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -1293,229 +876,187 @@ export function ImportContactsPage() {
 
           {!selectedPhoneColumn && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-              Select the column containing
-              WhatsApp phone numbers to
-              continue validation.
+              Select the column containing WhatsApp phone numbers to continue
+              validation.
             </div>
           )}
 
           {/* VALIDATION */}
 
-          {validation &&
-            selectedPhoneColumn && (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                      Total Rows
-                    </p>
+          {validation && selectedPhoneColumn && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Total Rows
+                  </p>
 
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
-                      {
-                        validation.summary
-                          .totalRows
-                      }
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                    <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">
-                      Valid
-                    </p>
-
-                    <p className="mt-2 text-2xl font-bold text-emerald-700">
-                      {
-                        validation.summary
-                          .validRows
-                      }
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-                    <p className="text-xs font-medium uppercase tracking-wide text-red-600">
-                      Invalid
-                    </p>
-
-                    <p className="mt-2 text-2xl font-bold text-red-700">
-                      {
-                        validation.summary
-                          .invalidRows
-                      }
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                    <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
-                      Duplicates
-                    </p>
-
-                    <p className="mt-2 text-2xl font-bold text-amber-700">
-                      {
-                        validation.summary
-                          .duplicateRows
-                      }
-                    </p>
-                  </div>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {validation.summary.totalRows}
+                  </p>
                 </div>
 
-                {/* VALIDATION TABLE */}
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">
+                    Valid
+                  </p>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="border-b border-slate-200 p-6">
-                    <h3 className="text-base font-semibold text-slate-900">
-                      Contact Validation
-                    </h3>
-                  </div>
+                  <p className="mt-2 text-2xl font-bold text-emerald-700">
+                    {validation.summary.validRows}
+                  </p>
+                </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-5 py-3 font-semibold text-slate-600">
-                            Row
-                          </th>
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-red-600">
+                    Invalid
+                  </p>
 
-                          <th className="px-5 py-3 font-semibold text-slate-600">
-                            Name
-                          </th>
+                  <p className="mt-2 text-2xl font-bold text-red-700">
+                    {validation.summary.invalidRows}
+                  </p>
+                </div>
 
-                          <th className="px-5 py-3 font-semibold text-slate-600">
-                            Original Phone
-                          </th>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
+                    Duplicates
+                  </p>
 
-                          <th className="px-5 py-3 font-semibold text-slate-600">
-                            Normalized Phone
-                          </th>
+                  <p className="mt-2 text-2xl font-bold text-amber-700">
+                    {validation.summary.duplicateRows}
+                  </p>
+                </div>
+              </div>
 
-                          <th className="px-5 py-3 font-semibold text-slate-600">
-                            Status
-                          </th>
+              {/* VALIDATION TABLE */}
 
-                          <th className="px-5 py-3 font-semibold text-slate-600">
-                            Reason
-                          </th>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 p-6">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Contact Validation
+                  </h3>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-5 py-3 font-semibold text-slate-600">
+                          Row
+                        </th>
+
+                        <th className="px-5 py-3 font-semibold text-slate-600">
+                          Name
+                        </th>
+
+                        <th className="px-5 py-3 font-semibold text-slate-600">
+                          Original Phone
+                        </th>
+
+                        <th className="px-5 py-3 font-semibold text-slate-600">
+                          Normalized Phone
+                        </th>
+
+                        <th className="px-5 py-3 font-semibold text-slate-600">
+                          Status
+                        </th>
+
+                        <th className="px-5 py-3 font-semibold text-slate-600">
+                          Reason
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {validation.contacts.map((contact) => (
+                        <tr key={contact.rowNumber}>
+                          <td className="px-5 py-3 text-slate-500">
+                            {contact.rowNumber}
+                          </td>
+
+                          <td className="px-5 py-3 font-medium text-slate-800">
+                            {contact.name || '—'}
+                          </td>
+
+                          <td className="px-5 py-3 text-slate-700">
+                            {contact.originalPhone || '—'}
+                          </td>
+
+                          <td className="px-5 py-3 font-medium text-slate-800">
+                            {contact.normalizedPhone ?? '—'}
+                          </td>
+
+                          <td className="px-5 py-3">
+                            {contact.status === 'valid' && (
+                              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                Valid
+                              </span>
+                            )}
+
+                            {contact.status === 'invalid' && (
+                              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                Invalid
+                              </span>
+                            )}
+
+                            {contact.status === 'duplicate' && (
+                              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                Duplicate
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="min-w-64 px-5 py-3 text-slate-500">
+                            {contact.reason ?? '—'}
+                          </td>
                         </tr>
-                      </thead>
-
-                      <tbody className="divide-y divide-slate-100">
-                        {validation.contacts.map(
-                          (
-                            contact,
-                          ) => (
-                            <tr
-                              key={
-                                contact.rowNumber
-                              }
-                            >
-                              <td className="px-5 py-3 text-slate-500">
-                                {
-                                  contact.rowNumber
-                                }
-                              </td>
-
-                              <td className="px-5 py-3 font-medium text-slate-800">
-                                {contact.name ||
-                                  '—'}
-                              </td>
-
-                              <td className="px-5 py-3 text-slate-700">
-                                {contact.originalPhone ||
-                                  '—'}
-                              </td>
-
-                              <td className="px-5 py-3 font-medium text-slate-800">
-                                {contact.normalizedPhone ??
-                                  '—'}
-                              </td>
-
-                              <td className="px-5 py-3">
-                                {contact.status ===
-                                  'valid' && (
-                                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                    Valid
-                                  </span>
-                                )}
-
-                                {contact.status ===
-                                  'invalid' && (
-                                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                                    Invalid
-                                  </span>
-                                )}
-
-                                {contact.status ===
-                                  'duplicate' && (
-                                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                                    Duplicate
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="min-w-64 px-5 py-3 text-slate-500">
-                                {contact.reason ??
-                                  '—'}
-                              </td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              </div>
 
-                {/* CONFIRM IMPORT */}
+              {/* CONFIRM IMPORT */}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">
-                        Confirm Import
-                      </h3>
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      Confirm Import
+                    </h3>
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        Save this participant
-                        list locally for use in
-                        campaigns.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={
-                        saveImport
-                      }
-                      disabled={
-                        saving ||
-                        Boolean(
-                          savedImportId,
-                        ) ||
-                        validation.summary
-                          .validRows === 0
-                      }
-                      className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {saving
-                        ? 'Saving...'
-                        : savedImportId
-                          ? 'Import Saved'
-                          : 'Save Import'}
-                    </button>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Save this participant list locally for use in campaigns.
+                    </p>
                   </div>
 
-                  {saveMessage && (
-                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
-                      <CheckCircle2
-                        size={18}
-                      />
-
-                      {
-                        saveMessage
-                      }
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={saveImport}
+                    disabled={
+                      saving ||
+                      Boolean(savedImportId) ||
+                      validation.summary.validRows === 0
+                    }
+                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving
+                      ? 'Saving...'
+                      : savedImportId
+                        ? 'Import Saved'
+                        : 'Save Import'}
+                  </button>
                 </div>
-              </>
-            )}
+
+                {saveMessage && (
+                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+                    <CheckCircle2 size={18} />
+
+                    {saveMessage}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1526,13 +1067,9 @@ export function ImportContactsPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-
             <div className="flex items-start gap-4 border-b border-slate-200 p-6">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50">
-                <AlertTriangle
-                  className="text-red-600"
-                  size={22}
-                />
+                <AlertTriangle className="text-red-600" size={22} />
               </div>
 
               <div>
@@ -1541,10 +1078,8 @@ export function ImportContactsPage() {
                 </h3>
 
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  This will permanently
-                  delete the saved import
-                  and its stored contact
-                  rows.
+                  This will permanently delete the saved import and its stored
+                  contact rows.
                 </p>
               </div>
             </div>
@@ -1552,43 +1087,24 @@ export function ImportContactsPage() {
             <div className="p-6">
               <div className="rounded-xl bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-800">
-                  {
-                    deleteTarget.filename
-                  }
+                  {deleteTarget.filename}
                 </p>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  {
-                    deleteTarget.totalRows
-                  }{' '}
-                  rows •{' '}
-                  {
-                    deleteTarget.validRows
-                  }{' '}
-                  valid
+                  {deleteTarget.totalRows} rows • {deleteTarget.validRows} valid
                 </p>
               </div>
 
               <p className="mt-4 text-sm leading-6 text-slate-600">
-                Existing campaigns will
-                not be deleted. If a
-                campaign references this
-                import, the relationship
-                will be detached.
+                Existing campaigns will not be deleted. If a campaign references
+                this import, the relationship will be detached.
               </p>
 
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    setDeleteTarget(
-                      null,
-                    )
-                  }
-                  disabled={
-                    deletingImportId !==
-                    null
-                  }
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deletingImportId !== null}
                   className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
@@ -1596,22 +1112,13 @@ export function ImportContactsPage() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    void confirmDeleteImport()
-                  }
-                  disabled={
-                    deletingImportId !==
-                    null
-                  }
+                  onClick={() => void confirmDeleteImport()}
+                  disabled={deletingImportId !== null}
                   className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Trash2
-                    size={16}
-                  />
+                  <Trash2 size={16} />
 
-                  {deletingImportId
-                    ? 'Deleting...'
-                    : 'Delete Import'}
+                  {deletingImportId ? 'Deleting...' : 'Delete Import'}
                 </button>
               </div>
             </div>
