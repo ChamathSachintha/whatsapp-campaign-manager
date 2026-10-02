@@ -1,3 +1,7 @@
+import type {
+  ContactValidationResult,
+} from './imports';
+
 export {};
 
 declare global {
@@ -36,6 +40,10 @@ declare global {
           sampleRows?: Array<
             Record<string, string>
           >;
+
+          validationResult?:
+            | ContactValidationResult
+            | null;
         }>;
     };
   }

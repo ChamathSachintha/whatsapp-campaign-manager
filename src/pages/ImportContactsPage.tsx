@@ -1,6 +1,8 @@
 import {
+  CheckCircle2,
   FileSpreadsheet,
   Upload,
+  XCircle,
 } from 'lucide-react';
 
 import { useState } from 'react';
@@ -53,6 +55,9 @@ export function ImportContactsPage() {
       setLoading(false);
     }
   }
+
+  const validation =
+    selectedFile?.validationResult;
 
   return (
     <>
@@ -183,20 +188,76 @@ export function ImportContactsPage() {
             </div>
           </div>
 
-          {/* SAMPLE ROWS */}
+          {/* VALIDATION SUMMARY */}
 
-          {selectedFile.sampleRows &&
-            selectedFile.sampleRows.length >
-              0 && (
+          {validation && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Total Rows
+                  </p>
+
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {
+                      validation.summary
+                        .totalRows
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">
+                    Valid
+                  </p>
+
+                  <p className="mt-2 text-2xl font-bold text-emerald-700">
+                    {
+                      validation.summary
+                        .validRows
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-red-600">
+                    Invalid
+                  </p>
+
+                  <p className="mt-2 text-2xl font-bold text-red-700">
+                    {
+                      validation.summary
+                        .invalidRows
+                    }
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
+                    Duplicates
+                  </p>
+
+                  <p className="mt-2 text-2xl font-bold text-amber-700">
+                    {
+                      validation.summary
+                        .duplicateRows
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* VALIDATED CONTACTS */}
+
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-200 p-6">
                   <h3 className="text-base font-semibold text-slate-900">
-                    Sample Rows
+                    Contact Validation
                   </h3>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Preview of the first five
-                    rows from the selected file.
+                    Phone numbers are normalized
+                    to the +94 format before
+                    campaign creation.
                   </p>
                 </div>
 
@@ -204,34 +265,94 @@ export function ImportContactsPage() {
                   <table className="min-w-full text-left text-sm">
                     <thead className="bg-slate-50">
                       <tr>
-                        {selectedFile.columns?.map(
-                          (column) => (
-                            <th
-                              key={column}
-                              className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600"
-                            >
-                              {column}
-                            </th>
-                          ),
-                        )}
+                        <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          Row
+                        </th>
+
+                        <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          Name
+                        </th>
+
+                        <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          Original Phone
+                        </th>
+
+                        <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          Normalized Phone
+                        </th>
+
+                        <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          Status
+                        </th>
+
+                        <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          Reason
+                        </th>
                       </tr>
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                      {selectedFile.sampleRows.map(
-                        (row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {selectedFile.columns?.map(
-                              (column) => (
-                                <td
-                                  key={column}
-                                  className="whitespace-nowrap px-5 py-3 text-slate-700"
-                                >
-                                  {row[column] ||
-                                    '—'}
-                                </td>
-                              ),
-                            )}
+                      {validation.contacts.map(
+                        (contact) => (
+                          <tr
+                            key={
+                              contact.rowNumber
+                            }
+                          >
+                            <td className="whitespace-nowrap px-5 py-3 text-slate-500">
+                              {
+                                contact.rowNumber
+                              }
+                            </td>
+
+                            <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                              {contact.name ||
+                                '—'}
+                            </td>
+
+                            <td className="whitespace-nowrap px-5 py-3 text-slate-700">
+                              {contact.originalPhone ||
+                                '—'}
+                            </td>
+
+                            <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                              {contact.normalizedPhone ??
+                                '—'}
+                            </td>
+
+                            <td className="px-5 py-3">
+                              {contact.status ===
+                                'valid' && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                  <CheckCircle2
+                                    size={14}
+                                  />
+                                  Valid
+                                </span>
+                              )}
+
+                              {contact.status ===
+                                'invalid' && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                  <XCircle
+                                    size={14}
+                                  />
+                                  Invalid
+                                </span>
+                              )}
+
+                              {contact.status ===
+                                'duplicate' && (
+                                <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                  Duplicate
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="min-w-64 px-5 py-3 text-slate-500">
+                              {contact.reason ??
+                                '—'}
+                            </td>
                           </tr>
                         ),
                       )}
@@ -239,7 +360,20 @@ export function ImportContactsPage() {
                   </table>
                 </div>
               </div>
-            )}
+            </>
+          )}
+
+          {/* NO PHONE COLUMN */}
+
+          {!selectedFile
+            .suggestedPhoneColumn && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+              A phone number column could not
+              be detected automatically.
+              Manual column selection will be
+              added next.
+            </div>
+          )}
         </div>
       )}
     </>

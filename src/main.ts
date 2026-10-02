@@ -9,6 +9,9 @@ import { parseContactFile } from './services/imports/file-parser';
 import {
   detectContactColumns,
 } from './services/imports/column-detector';
+import {
+  validateContacts,
+} from './services/imports/contact-validator';
 import started from 'electron-squirrel-startup';
 import {
   closeDatabase,
@@ -112,34 +115,47 @@ app.whenReady().then(() => {
       parseContactFile(filePath);
 
     const detectedColumns =
-      detectContactColumns(
-        parsed.columns,
-        parsed.rows,
-      );
+  detectContactColumns(
+    parsed.columns,
+    parsed.rows,
+  );
 
-    return {
-      canceled: false,
+const validationResult =
+  detectedColumns.phoneColumn
+    ? validateContacts({
+        rows: parsed.rows,
+        phoneColumn:
+          detectedColumns.phoneColumn,
+        nameColumn:
+          detectedColumns.nameColumn,
+      })
+    : null;
 
-      filePath,
+return {
+  canceled: false,
 
-      fileName:
-        parsed.fileName,
+  filePath,
 
-      fileType:
-        parsed.fileType,
+  fileName:
+    parsed.fileName,
 
-      columns:
-        parsed.columns,
+  fileType:
+    parsed.fileType,
 
-      suggestedPhoneColumn:
-        detectedColumns.phoneColumn,
+  columns:
+    parsed.columns,
 
-      suggestedNameColumn:
-        detectedColumns.nameColumn,
+  suggestedPhoneColumn:
+    detectedColumns.phoneColumn,
 
-      sampleRows:
-        parsed.rows.slice(0, 5),
-    };
+  suggestedNameColumn:
+    detectedColumns.nameColumn,
+
+  sampleRows:
+    parsed.rows.slice(0, 5),
+
+  validationResult,
+  };
   },
 );
 
