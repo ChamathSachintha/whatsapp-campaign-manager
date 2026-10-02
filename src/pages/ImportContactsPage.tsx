@@ -7,19 +7,18 @@ import { useState } from 'react';
 
 import { PageHeader } from '../components/PageHeader';
 
-type SelectedFile = {
-  filePath?: string;
-  fileName?: string;
-  fileType?: string;
-  columns?: string[];
-  sampleRows?: Array<
-    Record<string, string>
-  >;
-};
+import type {
+  ContactFileInspection,
+} from '../types/imports';
 
 export function ImportContactsPage() {
-  const [selectedFile, setSelectedFile] =
-    useState<SelectedFile | null>(null);
+  const [
+    selectedFile,
+    setSelectedFile,
+  ] =
+    useState<ContactFileInspection | null>(
+      null,
+    );
 
   const [loading, setLoading] =
     useState(false);
@@ -43,8 +42,12 @@ export function ImportContactsPage() {
     } catch (err) {
       console.error(err);
 
+      setSelectedFile(null);
+
       setError(
-        'Unable to open or read the selected file.',
+        err instanceof Error
+          ? err.message
+          : 'Unable to open or read the selected file.',
       );
     } finally {
       setLoading(false);
@@ -72,7 +75,7 @@ export function ImportContactsPage() {
           />
         </div>
 
-        <h3 className="mt-5 text-lg font-semibold">
+        <h3 className="mt-5 text-lg font-semibold text-slate-900">
           Import recipient file
         </h3>
 
@@ -96,34 +99,74 @@ export function ImportContactsPage() {
       </div>
 
       {selectedFile && (
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold">
-            Selected file
-          </h3>
+        <div className="mt-6 space-y-6">
+          {/* FILE INFORMATION */}
 
-          <div className="mt-4 space-y-3 text-sm">
-            <div>
-              <span className="text-slate-500">
-                File:
-              </span>{' '}
-              <span className="font-medium">
-                {selectedFile.fileName}
-              </span>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900">
+              File Information
+            </h3>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  File
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-slate-800">
+                  {selectedFile.fileName}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Type
+                </p>
+
+                <p className="mt-1 text-sm font-medium uppercase text-slate-800">
+                  {selectedFile.fileType}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* COLUMN DETECTION */}
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900">
+              Column Detection
+            </h3>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Detected Phone Column
+                </p>
+
+                <p className="mt-2 text-sm font-semibold text-slate-900">
+                  {selectedFile
+                    .suggestedPhoneColumn ??
+                    'Not detected'}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Detected Name Column
+                </p>
+
+                <p className="mt-2 text-sm font-semibold text-slate-900">
+                  {selectedFile
+                    .suggestedNameColumn ??
+                    'Not detected'}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <span className="text-slate-500">
-                Type:
-              </span>{' '}
-              <span className="font-medium uppercase">
-                {selectedFile.fileType}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-500">
-                Detected columns:
-              </span>
+            <div className="mt-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Available Columns
+              </p>
 
               <div className="mt-2 flex flex-wrap gap-2">
                 {selectedFile.columns?.map(
@@ -139,6 +182,64 @@ export function ImportContactsPage() {
               </div>
             </div>
           </div>
+
+          {/* SAMPLE ROWS */}
+
+          {selectedFile.sampleRows &&
+            selectedFile.sampleRows.length >
+              0 && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 p-6">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Sample Rows
+                  </h3>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Preview of the first five
+                    rows from the selected file.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {selectedFile.columns?.map(
+                          (column) => (
+                            <th
+                              key={column}
+                              className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600"
+                            >
+                              {column}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedFile.sampleRows.map(
+                        (row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {selectedFile.columns?.map(
+                              (column) => (
+                                <td
+                                  key={column}
+                                  className="whitespace-nowrap px-5 py-3 text-slate-700"
+                                >
+                                  {row[column] ||
+                                    '—'}
+                                </td>
+                              ),
+                            )}
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
         </div>
       )}
     </>

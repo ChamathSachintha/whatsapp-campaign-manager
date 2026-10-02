@@ -3,27 +3,40 @@ export {};
 declare global {
   interface Window {
     appAPI: {
-      getVersion: () => Promise<string>;
+      getVersion: () =>
+        Promise<string>;
 
-      getDatabaseHealth: () => Promise<{
-        connected: boolean;
-        tables: string[];
-        tableCount: number;
-      }>;
+      getDatabaseHealth: () =>
+        Promise<{
+          connected: boolean;
+          tables: string[];
+          tableCount: number;
+        }>;
 
-      chooseContactFile: () => Promise<{
-        canceled: boolean;
+      chooseContactFile: () =>
+        Promise<{
+          canceled: boolean;
 
-        filePath?: string;
-        fileName?: string;
-        fileType?: string;
+          filePath?: string;
 
-        columns?: string[];
+          fileName?: string;
 
-        sampleRows?: Array<
-          Record<string, string>
-        >;
-      }>;
+          fileType?: string;
+
+          columns?: string[];
+
+          suggestedPhoneColumn?:
+            | string
+            | null;
+
+          suggestedNameColumn?:
+            | string
+            | null;
+
+          sampleRows?: Array<
+            Record<string, string>
+          >;
+        }>;
     };
   }
 }
