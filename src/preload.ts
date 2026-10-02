@@ -1,120 +1,109 @@
-import {
-  contextBridge,
-  ipcRenderer,
-} from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
-contextBridge.exposeInMainWorld(
-  'appAPI',
-  {
-    getVersion: () =>
-      ipcRenderer.invoke(
-        'app:get-version',
-      ),
+contextBridge.exposeInMainWorld('appAPI', {
+  getVersion: () => ipcRenderer.invoke('app:get-version'),
 
-    getDatabaseHealth: () =>
-      ipcRenderer.invoke(
-        'database:get-health',
-      ),
+  getDatabaseHealth: () => ipcRenderer.invoke('database:get-health'),
 
-    chooseContactFile: () =>
-      ipcRenderer.invoke(
-        'imports:choose-file',
-      ),
+  chooseContactFile: () => ipcRenderer.invoke('imports:choose-file'),
 
-    validateContactFile: (
-      options: {
-        filePath: string;
-        phoneColumn: string;
-        nameColumn?: string | null;
-      },
-    ) =>
-      ipcRenderer.invoke(
-        'imports:validate-file',
-        options,
-      ),
+  validateContactFile: (options: {
+    filePath: string;
 
-    saveContactImport: (
-      options: {
-        filePath: string;
-        phoneColumn: string;
-        nameColumn?: string | null;
-        sourceNote?: string | null;
-      },
-    ) =>
-      ipcRenderer.invoke(
-        'imports:save',
-        options,
-      ),
+    phoneColumn: string;
 
-    listSavedImports: () =>
-      ipcRenderer.invoke(
-        'imports:list',
-      ),
+    nameColumn?: string | null;
+  }) => ipcRenderer.invoke('imports:validate-file', options),
 
-    getSavedImportDetails: (
-      importId: string,
-    ) =>
-      ipcRenderer.invoke(
-        'imports:get-details',
-        importId,
-      ),
+  saveContactImport: (options: {
+    filePath: string;
 
-    deleteSavedImport: (
-      importId: string,
-    ) =>
-      ipcRenderer.invoke(
-        'imports:delete',
-        importId,
-      ),
+    phoneColumn: string;
 
-    chooseCampaignAttachment: (
+    nameColumn?: string | null;
+
+    sourceNote?: string | null;
+  }) => ipcRenderer.invoke('imports:save', options),
+
+  listSavedImports: () => ipcRenderer.invoke('imports:list'),
+
+  getSavedImportDetails: (importId: string) =>
+    ipcRenderer.invoke('imports:get-details', importId),
+
+  deleteSavedImport: (importId: string) =>
+    ipcRenderer.invoke('imports:delete', importId),
+
+  chooseCampaignAttachment: (type: 'image' | 'document') =>
+    ipcRenderer.invoke('campaigns:choose-attachment', type),
+
+  saveCampaignDraft: (options: {
+    name: string;
+
+    description?: string | null;
+
+    importId: string;
+
+    messages: Array<{
       type:
+        | 'text'
         | 'image'
-        | 'document',
-    ) =>
-      ipcRenderer.invoke(
-        'campaigns:choose-attachment',
-        type,
-      ),
+        | 'image-caption'
+        | 'document'
+        | 'document-caption';
 
-    saveCampaignDraft: (
-      options: {
-        name: string;
+      text?: string | null;
 
-        description?: string | null;
+      caption?: string | null;
 
-        importId: string;
+      filePath?: string | null;
 
-        messages: Array<{
-          type:
-            | 'text'
-            | 'image'
-            | 'image-caption'
-            | 'document'
-            | 'document-caption';
+      fileName?: string | null;
 
-          text?: string | null;
+      fileExtension?: string | null;
 
-          caption?: string | null;
+      fileSizeBytes?: number | null;
+    }>;
+  }) => ipcRenderer.invoke('campaigns:save-draft', options),
 
-          filePath?: string | null;
+  listSavedCampaigns: () => ipcRenderer.invoke('campaigns:list'),
 
-          fileName?: string | null;
+  getSavedCampaignDetails: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:get-details', campaignId),
 
-          fileExtension?: string | null;
+  getCampaignMediaPreview: (mediaAssetId: string) =>
+    ipcRenderer.invoke('campaigns:get-media-preview', mediaAssetId),
 
-          fileSizeBytes?: number | null;
-        }>;
-      },
-    ) =>
-      ipcRenderer.invoke(
-        'campaigns:save-draft',
-        options,
-      ),
+  updateCampaignDraft: (options: {
+    campaignId: string;
 
-    listSavedCampaigns: () =>
-      ipcRenderer.invoke(
-        'campaigns:list',
-      ),
-  },
-);
+    name: string;
+
+    description?: string | null;
+
+    messages: Array<{
+      type:
+        | 'text'
+        | 'image'
+        | 'image-caption'
+        | 'document'
+        | 'document-caption';
+
+      text?: string | null;
+
+      caption?: string | null;
+
+      filePath?: string | null;
+
+      fileName?: string | null;
+
+      fileExtension?: string | null;
+
+      fileSizeBytes?: number | null;
+
+      existingMediaAssetId?: string | null;
+    }>;
+  }) => ipcRenderer.invoke('campaigns:update-draft', options),
+
+  deleteCampaign: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:delete', campaignId),
+});

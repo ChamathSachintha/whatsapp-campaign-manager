@@ -1,209 +1,328 @@
-import type {
-  ContactValidationResult,
-} from './imports';
+import type { ContactValidationResult } from './imports';
 
 export {};
 
 declare global {
   interface Window {
     appAPI: {
-      getVersion: () =>
-        Promise<string>;
+      getVersion: () => Promise<string>;
 
-      getDatabaseHealth: () =>
-        Promise<{
-          connected: boolean;
-          tables: string[];
-          tableCount: number;
-        }>;
+      getDatabaseHealth: () => Promise<{
+        connected: boolean;
 
-      chooseContactFile: () =>
-        Promise<{
-          canceled: boolean;
+        tables: string[];
 
-          filePath?: string;
+        tableCount: number;
+      }>;
 
-          fileName?: string;
+      chooseContactFile: () => Promise<{
+        canceled: boolean;
 
-          fileType?: string;
+        filePath?: string;
 
-          columns?: string[];
+        fileName?: string;
 
-          suggestedPhoneColumn?:
-            | string
-            | null;
+        fileType?: string;
 
-          suggestedNameColumn?:
-            | string
-            | null;
+        columns?: string[];
 
-          sampleRows?: Array<
-            Record<string, string>
-          >;
+        suggestedPhoneColumn?: string | null;
 
-          validationResult?:
-            | ContactValidationResult
-            | null;
-        }>;
+        suggestedNameColumn?: string | null;
 
-      validateContactFile: (
-        options: {
-          filePath: string;
-          phoneColumn: string;
-          nameColumn?: string | null;
-        },
-      ) =>
-        Promise<ContactValidationResult>;
+        sampleRows?: Array<Record<string, string>>;
 
-      saveContactImport: (
-        options: {
-          filePath: string;
-          phoneColumn: string;
-          nameColumn?: string | null;
-          sourceNote?: string | null;
-        },
-      ) =>
-        Promise<{
-          importId: string;
-          totalRows: number;
-          validRows: number;
-          invalidRows: number;
-          duplicateRows: number;
-        }>;
+        validationResult?: ContactValidationResult | null;
+      }>;
 
-      listSavedImports: () =>
-        Promise<
-          Array<{
-            id: string;
-            filename: string;
-            fileType: string;
-            importedAt: string;
-            totalRows: number;
-            validRows: number;
-            invalidRows: number;
-            duplicateRows: number;
-          }>
-        >;
+      validateContactFile: (options: {
+        filePath: string;
 
-      getSavedImportDetails: (
-        importId: string,
-      ) =>
-        Promise<{
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+      }) => Promise<ContactValidationResult>;
+
+      saveContactImport: (options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+
+        sourceNote?: string | null;
+      }) => Promise<{
+        importId: string;
+
+        totalRows: number;
+
+        validRows: number;
+
+        invalidRows: number;
+
+        duplicateRows: number;
+      }>;
+
+      listSavedImports: () => Promise<
+        Array<{
           id: string;
+
           filename: string;
+
           fileType: string;
+
           importedAt: string;
+
           totalRows: number;
+
           validRows: number;
+
           invalidRows: number;
+
           duplicateRows: number;
+        }>
+      >;
 
-          contacts: Array<{
-            id: string;
-            name: string;
-            originalPhone: string;
+      getSavedImportDetails: (importId: string) => Promise<{
+        id: string;
 
-            normalizedPhone:
-              | string
-              | null;
+        filename: string;
 
-            validationStatus: string;
+        fileType: string;
 
-            validationReason:
-              | string
-              | null;
+        importedAt: string;
 
-            isDuplicate: boolean;
+        totalRows: number;
 
-            rowNumber:
-              | number
-              | null;
-          }>;
-        }>;
+        validRows: number;
 
-      deleteSavedImport: (
-        importId: string,
-      ) =>
-        Promise<{
-          importId: string;
-          deletedContacts: number;
-          detachedCampaigns: number;
-        }>;
+        invalidRows: number;
 
-      chooseCampaignAttachment: (
-        type:
-          | 'image'
-          | 'document',
-      ) =>
-        Promise<
-          | {
-              canceled: true;
-            }
-          | {
-              canceled: false;
-              filePath: string;
-              fileName: string;
-              extension: string;
-              sizeBytes: number;
-            }
-        >;
+        duplicateRows: number;
 
-      saveCampaignDraft: (
-        options: {
+        contacts: Array<{
+          id: string;
+
           name: string;
 
-          description?: string | null;
+          originalPhone: string;
 
-          importId: string;
+          normalizedPhone: string | null;
 
-          messages: Array<{
-            type:
-              | 'text'
-              | 'image'
-              | 'image-caption'
-              | 'document'
-              | 'document-caption';
+          validationStatus: string;
 
-            text?: string | null;
+          validationReason: string | null;
 
-            caption?: string | null;
+          isDuplicate: boolean;
 
-            filePath?: string | null;
+          rowNumber: number | null;
+        }>;
+      }>;
 
-            fileName?: string | null;
+      deleteSavedImport: (importId: string) => Promise<{
+        importId: string;
 
-            fileExtension?: string | null;
+        deletedContacts: number;
 
-            fileSizeBytes?: number | null;
-          }>;
-        },
-      ) =>
-        Promise<{
-          campaignId: string;
+        detachedCampaigns: number;
+      }>;
+
+      chooseCampaignAttachment: (type: 'image' | 'document') => Promise<
+        | {
+            canceled: true;
+          }
+        | {
+            canceled: false;
+
+            filePath: string;
+
+            fileName: string;
+
+            extension: string;
+
+            sizeBytes: number;
+          }
+      >;
+
+      saveCampaignDraft: (options: {
+        name: string;
+
+        description?: string | null;
+
+        importId: string;
+
+        messages: Array<{
+          type:
+            | 'text'
+            | 'image'
+            | 'image-caption'
+            | 'document'
+            | 'document-caption';
+
+          text?: string | null;
+
+          caption?: string | null;
+
+          filePath?: string | null;
+
+          fileName?: string | null;
+
+          fileExtension?: string | null;
+
+          fileSizeBytes?: number | null;
+        }>;
+      }) => Promise<{
+        campaignId: string;
+
+        recipientCount: number;
+
+        messageCount: number;
+
+        mediaCount: number;
+      }>;
+
+      listSavedCampaigns: () => Promise<
+        Array<{
+          id: string;
+
+          name: string;
+
+          description: string | null;
+
+          status: string;
+
+          importId: string | null;
+
+          createdAt: string;
+
+          updatedAt: string;
+
           recipientCount: number;
+
           messageCount: number;
+
           mediaCount: number;
+        }>
+      >;
+
+      getSavedCampaignDetails: (campaignId: string) => Promise<{
+        id: string;
+
+        name: string;
+
+        description: string | null;
+
+        status: string;
+
+        importId: string | null;
+
+        importFilename: string | null;
+
+        createdAt: string;
+
+        updatedAt: string;
+
+        totalRecipients: number;
+
+        eligibleRecipients: number;
+
+        processedCount: number;
+
+        successCount: number;
+
+        failureCount: number;
+
+        messages: Array<{
+          id: string;
+
+          position: number;
+
+          type: string;
+
+          textContent: string | null;
+
+          caption: string | null;
+
+          media: {
+            id: string;
+
+            originalFilename: string;
+
+            mimeType: string | null;
+
+            fileSize: number | null;
+          } | null;
         }>;
 
-      listSavedCampaigns: () =>
-        Promise<
-          Array<{
-            id: string;
-            name: string;
-            description:
-              | string
-              | null;
-            status: string;
-            importId:
-              | string
-              | null;
-            createdAt: string;
-            updatedAt: string;
-            recipientCount: number;
-            messageCount: number;
-            mediaCount: number;
-          }>
-        >;
+        recipients: Array<{
+          id: string;
+
+          name: string | null;
+
+          normalizedPhone: string;
+
+          originalPhone: string | null;
+
+          status: string;
+        }>;
+      }>;
+
+      getCampaignMediaPreview: (mediaAssetId: string) => Promise<{
+        mediaAssetId: string;
+
+        fileName: string;
+
+        mimeType: string;
+
+        dataUrl: string;
+      }>;
+
+      updateCampaignDraft: (options: {
+        campaignId: string;
+
+        name: string;
+
+        description?: string | null;
+
+        messages: Array<{
+          type:
+            | 'text'
+            | 'image'
+            | 'image-caption'
+            | 'document'
+            | 'document-caption';
+
+          text?: string | null;
+
+          caption?: string | null;
+
+          filePath?: string | null;
+
+          fileName?: string | null;
+
+          fileExtension?: string | null;
+
+          fileSizeBytes?: number | null;
+
+          existingMediaAssetId?: string | null;
+        }>;
+      }) => Promise<{
+        campaignId: string;
+
+        messageCount: number;
+
+        mediaCount: number;
+      }>;
+
+      deleteCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        deletedMessages: number;
+
+        deletedRecipients: number;
+
+        deletedMedia: number;
+      }>;
     };
   }
 }
