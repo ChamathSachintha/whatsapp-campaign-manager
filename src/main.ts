@@ -10,6 +10,14 @@ import { getDatabaseHealth } from './db/health';
 
 import { detectContactColumns } from './services/imports/column-detector';
 
+import {
+  saveCampaignDraft,
+} from './services/campaigns/campaign-repository';
+
+import {
+  chooseCampaignAttachment,
+} from './services/campaigns/media-picker';
+
 import { validateContacts } from './services/imports/contact-validator';
 
 import { parseContactFile } from './services/imports/file-parser';
@@ -280,6 +288,75 @@ app.whenReady().then(() => {
   ipcMain.handle('imports:delete', (_event, importId: string) => {
     return deleteSavedImport(importId);
   });
+
+  /* -------------------------------------------------------
+   CHOOSE CAMPAIGN ATTACHMENT
+   ------------------------------------------------------- */
+
+ipcMain.handle(
+  'campaigns:choose-attachment',
+  (
+    _event,
+    type:
+      | 'image'
+      | 'document',
+  ) => {
+    if (
+      type !== 'image' &&
+      type !== 'document'
+    ) {
+      throw new Error(
+        'Invalid campaign attachment type.',
+      );
+    }
+
+    return chooseCampaignAttachment(
+      type,
+    );
+  },
+);
+  /* -------------------------------------------------------
+   SAVE CAMPAIGN DRAFT
+   ------------------------------------------------------- */
+
+ipcMain.handle(
+  'campaigns:save-draft',
+  (
+    _event,
+    options: {
+      name: string;
+
+      description?: string | null;
+
+      importId: string;
+
+      messages: Array<{
+        type:
+          | 'text'
+          | 'image'
+          | 'image-caption'
+          | 'document'
+          | 'document-caption';
+
+        text?: string | null;
+
+        caption?: string | null;
+
+        filePath?: string | null;
+
+        fileName?: string | null;
+
+        fileExtension?: string | null;
+
+        fileSizeBytes?: number | null;
+      }>;
+    },
+  ) => {
+    return saveCampaignDraft(
+      options,
+    );
+  },
+);
 
   /* -------------------------------------------------------
      APP VERSION

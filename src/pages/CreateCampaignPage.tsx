@@ -6,10 +6,13 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
+  Paperclip,
   Plus,
+  Save,
   Trash2,
   Type,
   Users,
+  X,
 } from 'lucide-react';
 
 import {
@@ -50,14 +53,19 @@ type SavedImportDetails = {
     id: string;
     name: string;
     originalPhone: string;
+
     normalizedPhone:
       | string
       | null;
+
     validationStatus: string;
+
     validationReason:
       | string
       | null;
+
     isDuplicate: boolean;
+
     rowNumber:
       | number
       | null;
@@ -73,10 +81,35 @@ type MessageType =
 
 type CampaignMessage = {
   id: string;
+
   type: MessageType;
+
   text: string;
+
   caption: string;
-  fileName: string | null;
+
+  filePath:
+    | string
+    | null;
+
+  fileName:
+    | string
+    | null;
+
+  fileExtension:
+    | string
+    | null;
+
+  fileSizeBytes:
+    | number
+    | null;
+};
+
+type SavedDraftResult = {
+  campaignId: string;
+  recipientCount: number;
+  messageCount: number;
+  mediaCount: number;
 };
 
 /* =========================================================
@@ -94,27 +127,32 @@ const messageTypeOptions: Array<{
     description:
       'Send a normal WhatsApp text message.',
   },
+
   {
     type: 'image',
     label: 'Image',
     description:
       'Send an image without a caption.',
   },
+
   {
     type: 'image-caption',
     label: 'Image + Caption',
     description:
       'Send an image with accompanying text.',
   },
+
   {
     type: 'document',
     label: 'Document',
     description:
       'Send a file or document.',
   },
+
   {
     type: 'document-caption',
-    label: 'Document + Caption',
+    label:
+      'Document + Caption',
     description:
       'Send a document with accompanying text.',
   },
@@ -129,10 +167,20 @@ function createMessage(
 ): CampaignMessage {
   return {
     id: crypto.randomUUID(),
+
     type,
+
     text: '',
+
     caption: '',
+
+    filePath: null,
+
     fileName: null,
+
+    fileExtension: null,
+
+    fileSizeBytes: null,
   };
 }
 
@@ -156,12 +204,99 @@ function getMessageIcon(
 
   if (
     type === 'image' ||
-    type === 'image-caption'
+    type ===
+      'image-caption'
   ) {
     return ImageIcon;
   }
 
   return FileText;
+}
+
+function getAttachmentType(
+  type: MessageType,
+):
+  | 'image'
+  | 'document'
+  | null {
+  if (
+    type === 'image' ||
+    type ===
+      'image-caption'
+  ) {
+    return 'image';
+  }
+
+  if (
+    type === 'document' ||
+    type ===
+      'document-caption'
+  ) {
+    return 'document';
+  }
+
+  return null;
+}
+
+function formatFileSize(
+  bytes: number,
+) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const kilobytes =
+    bytes / 1024;
+
+  if (
+    kilobytes < 1024
+  ) {
+    return `${kilobytes.toFixed(
+      1,
+    )} KB`;
+  }
+
+  const megabytes =
+    kilobytes / 1024;
+
+  return `${megabytes.toFixed(
+    1,
+  )} MB`;
+}
+
+function isMessageComplete(
+  message: CampaignMessage,
+) {
+  if (
+    message.type === 'text'
+  ) {
+    return (
+      message.text
+        .trim()
+        .length > 0
+    );
+  }
+
+  if (
+    !message.filePath
+  ) {
+    return false;
+  }
+
+  if (
+    message.type ===
+      'image-caption' ||
+    message.type ===
+      'document-caption'
+  ) {
+    return (
+      message.caption
+        .trim()
+        .length > 0
+    );
+  }
+
+  return true;
 }
 
 /* =========================================================
@@ -231,6 +366,28 @@ export function CreateCampaignPage() {
       CampaignMessage[]
     >([]);
 
+  const [
+    selectingAttachmentId,
+    setSelectingAttachmentId,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
+    savingDraft,
+    setSavingDraft,
+  ] =
+    useState(false);
+
+  const [
+    savedDraft,
+    setSavedDraft,
+  ] =
+    useState<
+      SavedDraftResult | null
+    >(null);
+
   /* =========================================================
      LOAD SAVED IMPORTS
      ========================================================= */
@@ -245,17 +402,21 @@ export function CreateCampaignPage() {
         setError(null);
 
         const result =
-          await window.appAPI
+          await window
+            .appAPI
             .listSavedImports();
 
         setSavedImports(
           result,
         );
       } catch (err) {
-        console.error(err);
+        console.error(
+          err,
+        );
 
         setError(
-          err instanceof Error
+          err instanceof
+            Error
             ? err.message
             : 'Unable to load saved contact imports.',
         );
@@ -276,6 +437,10 @@ export function CreateCampaignPage() {
   async function handleImportChange(
     importId: string,
   ) {
+    if (savedDraft) {
+      return;
+    }
+
     setSelectedImportId(
       importId,
     );
@@ -296,7 +461,8 @@ export function CreateCampaignPage() {
       setError(null);
 
       const result =
-        await window.appAPI
+        await window
+          .appAPI
           .getSavedImportDetails(
             importId,
           );
@@ -305,10 +471,13 @@ export function CreateCampaignPage() {
         result,
       );
     } catch (err) {
-      console.error(err);
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'Unable to load the selected contact list.',
       );
@@ -326,10 +495,16 @@ export function CreateCampaignPage() {
   function addMessage(
     type: MessageType,
   ) {
+    if (savedDraft) {
+      return;
+    }
+
     setMessages(
       (current) => [
         ...current,
-        createMessage(type),
+        createMessage(
+          type,
+        ),
       ],
     );
   }
@@ -337,6 +512,10 @@ export function CreateCampaignPage() {
   function removeMessage(
     messageId: string,
   ) {
+    if (savedDraft) {
+      return;
+    }
+
     setMessages(
       (current) =>
         current.filter(
@@ -350,7 +529,10 @@ export function CreateCampaignPage() {
   function moveMessageUp(
     index: number,
   ) {
-    if (index <= 0) {
+    if (
+      savedDraft ||
+      index <= 0
+    ) {
       return;
     }
 
@@ -361,9 +543,13 @@ export function CreateCampaignPage() {
         ];
 
         const previous =
-          updated[index - 1];
+          updated[
+            index - 1
+          ];
 
-        updated[index - 1] =
+        updated[
+          index - 1
+        ] =
           updated[index];
 
         updated[index] =
@@ -377,23 +563,32 @@ export function CreateCampaignPage() {
   function moveMessageDown(
     index: number,
   ) {
-    if (
-      index >=
-      messages.length - 1
-    ) {
+    if (savedDraft) {
       return;
     }
 
     setMessages(
       (current) => {
+        if (
+          index >=
+          current.length -
+            1
+        ) {
+          return current;
+        }
+
         const updated = [
           ...current,
         ];
 
         const next =
-          updated[index + 1];
+          updated[
+            index + 1
+          ];
 
-        updated[index + 1] =
+        updated[
+          index + 1
+        ] =
           updated[index];
 
         updated[index] =
@@ -408,6 +603,10 @@ export function CreateCampaignPage() {
     messageId: string,
     text: string,
   ) {
+    if (savedDraft) {
+      return;
+    }
+
     setMessages(
       (current) =>
         current.map(
@@ -427,6 +626,10 @@ export function CreateCampaignPage() {
     messageId: string,
     caption: string,
   ) {
+    if (savedDraft) {
+      return;
+    }
+
     setMessages(
       (current) =>
         current.map(
@@ -436,6 +639,128 @@ export function CreateCampaignPage() {
               ? {
                   ...message,
                   caption,
+                }
+              : message,
+        ),
+    );
+  }
+
+  /* =========================================================
+     CHOOSE ATTACHMENT
+     ========================================================= */
+
+  async function chooseAttachment(
+    messageId: string,
+    messageType: MessageType,
+  ) {
+    if (savedDraft) {
+      return;
+    }
+
+    const attachmentType =
+      getAttachmentType(
+        messageType,
+      );
+
+    if (
+      !attachmentType
+    ) {
+      return;
+    }
+
+    try {
+      setSelectingAttachmentId(
+        messageId,
+      );
+
+      setError(null);
+
+      const result =
+        await window
+          .appAPI
+          .chooseCampaignAttachment(
+            attachmentType,
+          );
+
+      if (
+        result.canceled
+      ) {
+        return;
+      }
+
+      setMessages(
+        (current) =>
+          current.map(
+            (message) =>
+              message.id ===
+              messageId
+                ? {
+                    ...message,
+
+                    filePath:
+                      result.filePath,
+
+                    fileName:
+                      result.fileName,
+
+                    fileExtension:
+                      result.extension,
+
+                    fileSizeBytes:
+                      result.sizeBytes,
+                  }
+                : message,
+          ),
+      );
+    } catch (err) {
+      console.error(
+        err,
+      );
+
+      setError(
+        err instanceof
+          Error
+          ? err.message
+          : 'Unable to select the attachment.',
+      );
+    } finally {
+      setSelectingAttachmentId(
+        null,
+      );
+    }
+  }
+
+  /* =========================================================
+     REMOVE ATTACHMENT
+     ========================================================= */
+
+  function removeAttachment(
+    messageId: string,
+  ) {
+    if (savedDraft) {
+      return;
+    }
+
+    setMessages(
+      (current) =>
+        current.map(
+          (message) =>
+            message.id ===
+            messageId
+              ? {
+                  ...message,
+
+                  filePath:
+                    null,
+
+                  fileName:
+                    null,
+
+                  fileExtension:
+                    null,
+
+                  fileSizeBytes:
+                    null,
                 }
               : message,
         ),
@@ -463,15 +788,115 @@ export function CreateCampaignPage() {
     );
 
   const campaignDetailsReady =
-    campaignName.trim().length >
-      0 &&
+    campaignName
+      .trim()
+      .length > 0 &&
     Boolean(
       selectedImport,
     ) &&
-    validContacts.length > 0;
+    validContacts.length >
+      0;
+
+  const completedMessages =
+    messages.filter(
+      isMessageComplete,
+    ).length;
 
   const messagesReady =
-    messages.length > 0;
+    messages.length >
+      0 &&
+    completedMessages ===
+      messages.length;
+
+  const campaignStructureReady =
+    campaignDetailsReady &&
+    messagesReady;
+
+  /* =========================================================
+     SAVE DRAFT
+     ========================================================= */
+
+  async function saveDraft() {
+    if (
+      !campaignStructureReady ||
+      !selectedImportId ||
+      savedDraft
+    ) {
+      return;
+    }
+
+    try {
+      setSavingDraft(
+        true,
+      );
+
+      setError(null);
+
+      const result =
+        await window
+          .appAPI
+          .saveCampaignDraft({
+            name:
+              campaignName,
+
+            description:
+              description ||
+              null,
+
+            importId:
+              selectedImportId,
+
+            messages:
+              messages.map(
+                (
+                  message,
+                ) => ({
+                  type:
+                    message.type,
+
+                  text:
+                    message.text ||
+                    null,
+
+                  caption:
+                    message.caption ||
+                    null,
+
+                  filePath:
+                    message.filePath,
+
+                  fileName:
+                    message.fileName,
+
+                  fileExtension:
+                    message.fileExtension,
+
+                  fileSizeBytes:
+                    message.fileSizeBytes,
+                }),
+              ),
+          });
+
+      setSavedDraft(
+        result,
+      );
+    } catch (err) {
+      console.error(
+        err,
+      );
+
+      setError(
+        err instanceof
+          Error
+          ? err.message
+          : 'Unable to save the campaign draft.',
+      );
+    } finally {
+      setSavingDraft(
+        false,
+      );
+    }
+  }
 
   /* =========================================================
      UI
@@ -484,21 +909,68 @@ export function CreateCampaignPage() {
         description="Choose recipients and build an ordered sequence of WhatsApp messages."
       />
 
+      {/* ERROR */}
+
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
+      {/* SAVED SUCCESS */}
+
+      {savedDraft && (
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <div className="flex items-start gap-3">
+            <CheckCircle2
+              className="mt-0.5 shrink-0 text-emerald-600"
+              size={22}
+            />
+
+            <div>
+              <p className="font-semibold text-emerald-900">
+                Campaign draft
+                saved successfully
+              </p>
+
+              <p className="mt-1 text-sm leading-6 text-emerald-700">
+                {
+                  savedDraft.recipientCount
+                }{' '}
+                recipients,{' '}
+                {
+                  savedDraft.messageCount
+                }{' '}
+                messages and{' '}
+                {
+                  savedDraft.mediaCount
+                }{' '}
+                media files were
+                stored.
+              </p>
+
+              <p className="mt-2 break-all text-xs text-emerald-600">
+                Campaign ID:{' '}
+                {
+                  savedDraft.campaignId
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
 
         {/* ===================================================
-            MAIN CONTENT
+            MAIN
             =================================================== */}
 
         <div className="space-y-6">
 
-          {/* CAMPAIGN DETAILS */}
+          {/* =================================================
+              STEP 1
+              ================================================= */}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
@@ -510,18 +982,23 @@ export function CreateCampaignPage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Give this campaign a
-              clear name and optional
+              Give this
+              campaign a clear
+              name and optional
               description.
             </p>
 
             <div className="mt-6 space-y-5">
+
+              {/* NAME */}
+
               <div>
                 <label
                   htmlFor="campaign-name"
                   className="text-sm font-semibold text-slate-700"
                 >
                   Campaign Name
+
                   <span className="ml-1 text-red-500">
                     *
                   </span>
@@ -533,17 +1010,25 @@ export function CreateCampaignPage() {
                   value={
                     campaignName
                   }
+                  disabled={
+                    Boolean(
+                      savedDraft,
+                    )
+                  }
                   onChange={(
                     event,
                   ) =>
                     setCampaignName(
-                      event.target
+                      event
+                        .target
                         .value,
                     )
                   }
                   placeholder="Example: October Volunteer Meeting"
-                  maxLength={100}
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  maxLength={
+                    100
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
 
                 <div className="mt-1 flex justify-between text-xs text-slate-400">
@@ -560,6 +1045,8 @@ export function CreateCampaignPage() {
                 </div>
               </div>
 
+              {/* DESCRIPTION */}
+
               <div>
                 <label
                   htmlFor="campaign-description"
@@ -573,18 +1060,26 @@ export function CreateCampaignPage() {
                   value={
                     description
                   }
+                  disabled={
+                    Boolean(
+                      savedDraft,
+                    )
+                  }
                   onChange={(
                     event,
                   ) =>
                     setDescription(
-                      event.target
+                      event
+                        .target
                         .value,
                     )
                   }
                   placeholder="Optional notes about this campaign..."
                   rows={4}
-                  maxLength={500}
-                  className="mt-2 w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  maxLength={
+                    500
+                  }
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
 
                 <div className="mt-1 flex justify-between text-xs text-slate-400">
@@ -603,7 +1098,9 @@ export function CreateCampaignPage() {
             </div>
           </section>
 
-          {/* RECIPIENT LIST */}
+          {/* =================================================
+              STEP 2
+              ================================================= */}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
@@ -611,12 +1108,15 @@ export function CreateCampaignPage() {
             </p>
 
             <h3 className="mt-1 text-lg font-semibold text-slate-900">
-              Choose Recipients
+              Choose
+              Recipients
             </h3>
 
             <p className="mt-1 text-sm text-slate-500">
-              Select one of your saved
-              contact imports for this
+              Select one of
+              your saved
+              contact imports
+              for this
               campaign.
             </p>
 
@@ -641,26 +1141,32 @@ export function CreateCampaignPage() {
 
                   <div>
                     <p className="text-sm font-semibold text-amber-800">
-                      No saved contact
-                      lists available
+                      No saved
+                      contact lists
+                      available
                     </p>
 
                     <p className="mt-1 text-sm leading-6 text-amber-700">
-                      Import and save a
-                      participant list
-                      first.
+                      Import and
+                      save a
+                      participant
+                      list first.
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
               <>
+                {/* SELECT */}
+
                 <div className="mt-6">
                   <label
                     htmlFor="recipient-import"
                     className="text-sm font-semibold text-slate-700"
                   >
-                    Saved Contact List
+                    Saved
+                    Contact List
+
                     <span className="ml-1 text-red-500">
                       *
                     </span>
@@ -671,19 +1177,26 @@ export function CreateCampaignPage() {
                     value={
                       selectedImportId
                     }
+                    disabled={
+                      Boolean(
+                        savedDraft,
+                      )
+                    }
                     onChange={(
                       event,
                     ) =>
                       void handleImportChange(
-                        event.target
+                        event
+                          .target
                           .value,
                       )
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                   >
                     <option value="">
-                      Select a saved
-                      contact list
+                      Select a
+                      saved contact
+                      list
                     </option>
 
                     {savedImports.map(
@@ -705,7 +1218,8 @@ export function CreateCampaignPage() {
                           {
                             savedImport.validRows
                           }{' '}
-                          valid contacts
+                          valid
+                          contacts
                         </option>
                       ),
                     )}
@@ -719,14 +1233,17 @@ export function CreateCampaignPage() {
                       size={18}
                     />
 
-                    Loading contact
-                    list...
+                    Loading
+                    contact list...
                   </div>
                 )}
 
                 {selectedImport &&
                   !loadingImportDetails && (
                     <div className="mt-6 space-y-5">
+
+                      {/* COUNTS */}
+
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded-xl bg-slate-50 p-4">
                           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -777,6 +1294,8 @@ export function CreateCampaignPage() {
                         </div>
                       </div>
 
+                      {/* VALID */}
+
                       <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                         <CheckCircle2
                           className="mt-0.5 shrink-0 text-emerald-600"
@@ -793,13 +1312,16 @@ export function CreateCampaignPage() {
                           </p>
 
                           <p className="mt-1 text-sm text-emerald-700">
-                            Only validated,
+                            Only
+                            validated,
                             non-duplicate
-                            numbers will be
-                            used.
+                            numbers will
+                            be used.
                           </p>
                         </div>
                       </div>
+
+                      {/* PREVIEW */}
 
                       {previewContacts.length >
                         0 && (
@@ -860,7 +1382,9 @@ export function CreateCampaignPage() {
             )}
           </section>
 
-          {/* MESSAGE SEQUENCE */}
+          {/* =================================================
+              STEP 3
+              ================================================= */}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div>
@@ -869,22 +1393,26 @@ export function CreateCampaignPage() {
               </p>
 
               <h3 className="mt-1 text-lg font-semibold text-slate-900">
-                Message Sequence
+                Message
+                Sequence
               </h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                Add messages in the
-                exact order they should
-                be sent to each
+                Add messages in
+                the exact order
+                they should be
+                sent to each
                 recipient.
               </p>
             </div>
 
-            {/* ADD MESSAGE TYPES */}
+            {/* TYPES */}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {messageTypeOptions.map(
-                (option) => {
+                (
+                  option,
+                ) => {
                   const Icon =
                     getMessageIcon(
                       option.type,
@@ -896,16 +1424,23 @@ export function CreateCampaignPage() {
                         option.type
                       }
                       type="button"
+                      disabled={
+                        Boolean(
+                          savedDraft,
+                        )
+                      }
                       onClick={() =>
                         addMessage(
                           option.type,
                         )
                       }
-                      className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+                      className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
                         <Icon
-                          size={18}
+                          size={
+                            18
+                          }
                           className="text-slate-600"
                         />
                       </div>
@@ -929,7 +1464,7 @@ export function CreateCampaignPage() {
               )}
             </div>
 
-            {/* EMPTY MESSAGE STATE */}
+            {/* EMPTY */}
 
             {messages.length ===
               0 && (
@@ -940,18 +1475,20 @@ export function CreateCampaignPage() {
                 />
 
                 <p className="mt-3 text-sm font-semibold text-slate-700">
-                  No messages added
+                  No messages
+                  added
                 </p>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Choose a message type
-                  above to start the
-                  sequence.
+                  Choose a
+                  message type
+                  above to start
+                  the sequence.
                 </p>
               </div>
             )}
 
-            {/* MESSAGE BLOCKS */}
+            {/* BLOCKS */}
 
             {messages.length >
               0 && (
@@ -966,9 +1503,14 @@ export function CreateCampaignPage() {
                         message.type,
                       );
 
+                    const attachmentType =
+                      getAttachmentType(
+                        message.type,
+                      );
+
                     const requiresFile =
-                      message.type !==
-                      'text';
+                      attachmentType !==
+                      null;
 
                     const requiresCaption =
                       message.type ===
@@ -976,14 +1518,23 @@ export function CreateCampaignPage() {
                       message.type ===
                         'document-caption';
 
+                    const attachmentLoading =
+                      selectingAttachmentId ===
+                      message.id;
+
+                    const complete =
+                      isMessageComplete(
+                        message,
+                      );
+
                     return (
                       <div
                         key={
                           message.id
                         }
-                        className="rounded-2xl border border-slate-200 bg-slate-50"
+                        className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
                       >
-                        {/* MESSAGE HEADER */}
+                        {/* HEADER */}
 
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
                           <div className="flex items-center gap-3">
@@ -997,11 +1548,22 @@ export function CreateCampaignPage() {
                             </div>
 
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">
-                                Message{' '}
-                                {index +
-                                  1}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-slate-900">
+                                  Message{' '}
+                                  {index +
+                                    1}
+                                </p>
+
+                                {complete && (
+                                  <CheckCircle2
+                                    className="text-emerald-600"
+                                    size={
+                                      15
+                                    }
+                                  />
+                                )}
+                              </div>
 
                               <p className="text-xs text-slate-500">
                                 {getMessageLabel(
@@ -1014,14 +1576,17 @@ export function CreateCampaignPage() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
+                              disabled={
+                                Boolean(
+                                  savedDraft,
+                                ) ||
+                                index ===
+                                  0
+                              }
                               onClick={() =>
                                 moveMessageUp(
                                   index,
                                 )
-                              }
-                              disabled={
-                                index ===
-                                0
                               }
                               title="Move up"
                               className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
@@ -1035,15 +1600,18 @@ export function CreateCampaignPage() {
 
                             <button
                               type="button"
+                              disabled={
+                                Boolean(
+                                  savedDraft,
+                                ) ||
+                                index ===
+                                  messages.length -
+                                    1
+                              }
                               onClick={() =>
                                 moveMessageDown(
                                   index,
                                 )
-                              }
-                              disabled={
-                                index ===
-                                messages.length -
-                                  1
                               }
                               title="Move down"
                               className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
@@ -1057,13 +1625,18 @@ export function CreateCampaignPage() {
 
                             <button
                               type="button"
+                              disabled={
+                                Boolean(
+                                  savedDraft,
+                                )
+                              }
                               onClick={() =>
                                 removeMessage(
                                   message.id,
                                 )
                               }
                               title="Remove message"
-                              className="rounded-lg border border-red-200 bg-white p-2 text-red-600 transition hover:bg-red-50"
+                              className="rounded-lg border border-red-200 bg-white p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30"
                             >
                               <Trash2
                                 size={
@@ -1074,7 +1647,7 @@ export function CreateCampaignPage() {
                           </div>
                         </div>
 
-                        {/* MESSAGE CONTENT */}
+                        {/* CONTENT */}
 
                         <div className="p-5">
 
@@ -1099,6 +1672,11 @@ export function CreateCampaignPage() {
                                 value={
                                   message.text
                                 }
+                                disabled={
+                                  Boolean(
+                                    savedDraft,
+                                  )
+                                }
                                 onChange={(
                                   event,
                                 ) =>
@@ -1110,49 +1688,201 @@ export function CreateCampaignPage() {
                                   )
                                 }
                                 placeholder="Enter your WhatsApp message..."
-                                className="mt-2 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                className="mt-2 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                               />
+
+                              {!message.text.trim() && (
+                                <p className="mt-2 text-xs text-amber-600">
+                                  Enter
+                                  message
+                                  text to
+                                  complete
+                                  this
+                                  block.
+                                </p>
+                              )}
                             </div>
                           )}
 
-                          {/* FILE PLACEHOLDER */}
+                          {/* ATTACHMENT */}
 
                           {requiresFile && (
                             <div>
                               <p className="text-sm font-semibold text-slate-700">
-                                {message.type ===
-                                  'image' ||
-                                message.type ===
-                                  'image-caption'
+                                {attachmentType ===
+                                'image'
                                   ? 'Image'
                                   : 'Document'}
                               </p>
 
-                              <div className="mt-2 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
-                                <Icon
-                                  className="mx-auto text-slate-400"
-                                  size={
-                                    25
-                                  }
-                                />
+                              {message.fileName ? (
+                                <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex min-w-0 items-start gap-3">
+                                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white">
+                                        {attachmentType ===
+                                        'image' ? (
+                                          <ImageIcon
+                                            className="text-emerald-700"
+                                            size={
+                                              18
+                                            }
+                                          />
+                                        ) : (
+                                          <FileText
+                                            className="text-emerald-700"
+                                            size={
+                                              18
+                                            }
+                                          />
+                                        )}
+                                      </div>
 
-                                <p className="mt-3 text-sm font-medium text-slate-700">
-                                  File
-                                  selection
-                                  will be
-                                  connected
-                                  next.
-                                </p>
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-emerald-900">
+                                          {
+                                            message.fileName
+                                          }
+                                        </p>
 
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="mt-3 cursor-not-allowed rounded-lg bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-500"
-                                >
-                                  Choose
-                                  File
-                                </button>
-                              </div>
+                                        <p className="mt-1 text-xs text-emerald-700">
+                                          {message.fileExtension
+                                            ?.toUpperCase() ??
+                                            'FILE'}
+
+                                          {message.fileSizeBytes !==
+                                            null &&
+                                            ` • ${formatFileSize(
+                                              message.fileSizeBytes,
+                                            )}`}
+                                        </p>
+
+                                        <p
+                                          className="mt-1 truncate text-xs text-emerald-600"
+                                          title={
+                                            message.filePath ??
+                                            undefined
+                                          }
+                                        >
+                                          {
+                                            message.filePath
+                                          }
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        Boolean(
+                                          savedDraft,
+                                        )
+                                      }
+                                      onClick={() =>
+                                        removeAttachment(
+                                          message.id,
+                                        )
+                                      }
+                                      title="Remove attachment"
+                                      className="shrink-0 rounded-lg p-2 text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                    >
+                                      <X
+                                        size={
+                                          17
+                                        }
+                                      />
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      attachmentLoading ||
+                                      Boolean(
+                                        savedDraft,
+                                      )
+                                    }
+                                    onClick={() =>
+                                      void chooseAttachment(
+                                        message.id,
+                                        message.type,
+                                      )
+                                    }
+                                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {attachmentLoading ? (
+                                      <Loader2
+                                        className="animate-spin"
+                                        size={
+                                          15
+                                        }
+                                      />
+                                    ) : (
+                                      <Paperclip
+                                        size={
+                                          15
+                                        }
+                                      />
+                                    )}
+
+                                    {attachmentLoading
+                                      ? 'Opening...'
+                                      : 'Replace File'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="mt-2 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
+                                  <Icon
+                                    className="mx-auto text-slate-400"
+                                    size={
+                                      25
+                                    }
+                                  />
+
+                                  <p className="mt-3 text-sm font-medium text-slate-700">
+                                    {attachmentType ===
+                                    'image'
+                                      ? 'Choose an image for this message.'
+                                      : 'Choose a document for this message.'}
+                                  </p>
+
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      attachmentLoading ||
+                                      Boolean(
+                                        savedDraft,
+                                      )
+                                    }
+                                    onClick={() =>
+                                      void chooseAttachment(
+                                        message.id,
+                                        message.type,
+                                      )
+                                    }
+                                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {attachmentLoading ? (
+                                      <Loader2
+                                        className="animate-spin"
+                                        size={
+                                          15
+                                        }
+                                      />
+                                    ) : (
+                                      <Paperclip
+                                        size={
+                                          15
+                                        }
+                                      />
+                                    )}
+
+                                    {attachmentLoading
+                                      ? 'Opening...'
+                                      : 'Choose File'}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1175,6 +1905,11 @@ export function CreateCampaignPage() {
                                 value={
                                   message.caption
                                 }
+                                disabled={
+                                  Boolean(
+                                    savedDraft,
+                                  )
+                                }
                                 onChange={(
                                   event,
                                 ) =>
@@ -1185,9 +1920,21 @@ export function CreateCampaignPage() {
                                       .value,
                                   )
                                 }
-                                placeholder="Enter an optional caption..."
-                                className="mt-2 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                placeholder="Enter the caption..."
+                                className="mt-2 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                               />
+
+                              {!message.caption.trim() && (
+                                <p className="mt-2 text-xs text-amber-600">
+                                  Add a
+                                  caption
+                                  to
+                                  complete
+                                  this
+                                  message
+                                  block.
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1206,10 +1953,12 @@ export function CreateCampaignPage() {
 
         <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:sticky xl:top-6">
           <h3 className="font-semibold text-slate-900">
-            Campaign Summary
+            Campaign
+            Summary
           </h3>
 
           <dl className="mt-5 space-y-4 text-sm">
+
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <dt className="text-slate-500">
                 Name
@@ -1236,7 +1985,9 @@ export function CreateCampaignPage() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <dt className="flex items-center gap-2 text-slate-500">
                 <Users
-                  size={16}
+                  size={
+                    16
+                  }
                 />
 
                 Recipients
@@ -1261,61 +2012,161 @@ export function CreateCampaignPage() {
               </dd>
             </div>
 
+            <div className="flex justify-between border-b border-slate-100 pb-4">
+              <dt className="text-slate-500">
+                Complete
+              </dt>
+
+              <dd className="font-semibold text-slate-900">
+                {
+                  completedMessages
+                }
+                /
+                {
+                  messages.length
+                }
+              </dd>
+            </div>
+
             <div className="flex justify-between">
               <dt className="text-slate-500">
                 Status
               </dt>
 
-              <dd className="font-semibold text-slate-900">
-                Draft
+              <dd
+                className={`font-semibold ${
+                  savedDraft
+                    ? 'text-emerald-700'
+                    : 'text-slate-900'
+                }`}
+              >
+                {savedDraft
+                  ? 'Draft Saved'
+                  : 'Draft'}
               </dd>
             </div>
           </dl>
 
+          {/* READY STATE */}
+
           <div
             className={`mt-6 rounded-xl border p-4 ${
-              campaignDetailsReady &&
-              messagesReady
+              campaignStructureReady
                 ? 'border-emerald-200 bg-emerald-50'
                 : 'border-slate-200 bg-slate-50'
             }`}
           >
-            {campaignDetailsReady &&
-            messagesReady ? (
+            {savedDraft ? (
               <div className="flex items-start gap-3">
                 <CheckCircle2
                   className="mt-0.5 shrink-0 text-emerald-600"
-                  size={18}
+                  size={
+                    18
+                  }
+                />
+
+                <div>
+                  <p className="text-sm font-semibold text-emerald-800">
+                    Draft stored
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-emerald-700">
+                    Campaign,
+                    recipients,
+                    messages and
+                    attachments
+                    are now stored
+                    locally.
+                  </p>
+                </div>
+              </div>
+            ) : campaignStructureReady ? (
+              <div className="flex items-start gap-3">
+                <CheckCircle2
+                  className="mt-0.5 shrink-0 text-emerald-600"
+                  size={
+                    18
+                  }
                 />
 
                 <div>
                   <p className="text-sm font-semibold text-emerald-800">
                     Campaign
-                    structure ready
+                    ready to save
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-emerald-700">
-                    Next we will
-                    connect media files
-                    and save the draft.
+                    All required
+                    campaign
+                    information
+                    is complete.
                   </p>
                 </div>
               </div>
             ) : (
               <p className="text-sm leading-6 text-slate-500">
-                Add a campaign name,
-                recipient list and at
-                least one message.
+                Complete the
+                campaign name,
+                recipient list
+                and every
+                message block.
               </p>
             )}
           </div>
 
+          {/* SAVE */}
+
           <button
             type="button"
-            disabled
-            className="mt-4 w-full cursor-not-allowed rounded-xl bg-slate-200 px-4 py-3 text-sm font-semibold text-slate-500"
+            onClick={() =>
+              void saveDraft()
+            }
+            disabled={
+              !campaignStructureReady ||
+              savingDraft ||
+              Boolean(
+                savedDraft,
+              )
+            }
+            className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+              campaignStructureReady &&
+              !savedDraft
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                : 'cursor-not-allowed bg-slate-200 text-slate-500'
+            }`}
           >
-            Save Draft — Next
+            {savingDraft ? (
+              <>
+                <Loader2
+                  className="animate-spin"
+                  size={
+                    17
+                  }
+                />
+
+                Saving Draft...
+              </>
+            ) : savedDraft ? (
+              <>
+                <CheckCircle2
+                  size={
+                    17
+                  }
+                />
+
+                Draft Saved
+              </>
+            ) : (
+              <>
+                <Save
+                  size={
+                    17
+                  }
+                />
+
+                Save Draft
+              </>
+            )}
           </button>
         </aside>
       </div>

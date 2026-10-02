@@ -1,59 +1,94 @@
-import type { ContactValidationResult } from './imports';
+import type {
+  ContactValidationResult,
+} from './imports';
 
 export {};
 
 declare global {
   interface Window {
     appAPI: {
-      getVersion: () => Promise<string>;
+      getVersion: () =>
+        Promise<string>;
 
-      getDatabaseHealth: () => Promise<{
-        connected: boolean;
-        tables: string[];
-        tableCount: number;
-      }>;
+      getDatabaseHealth: () =>
+        Promise<{
+          connected: boolean;
+          tables: string[];
+          tableCount: number;
+        }>;
 
-      chooseContactFile: () => Promise<{
-        canceled: boolean;
+      chooseContactFile: () =>
+        Promise<{
+          canceled: boolean;
 
-        filePath?: string;
+          filePath?: string;
 
-        fileName?: string;
+          fileName?: string;
 
-        fileType?: string;
+          fileType?: string;
 
-        columns?: string[];
+          columns?: string[];
 
-        suggestedPhoneColumn?: string | null;
+          suggestedPhoneColumn?:
+            | string
+            | null;
 
-        suggestedNameColumn?: string | null;
+          suggestedNameColumn?:
+            | string
+            | null;
 
-        sampleRows?: Array<Record<string, string>>;
+          sampleRows?: Array<
+            Record<string, string>
+          >;
 
-        validationResult?: ContactValidationResult | null;
-      }>;
+          validationResult?:
+            | ContactValidationResult
+            | null;
+        }>;
 
-      validateContactFile: (options: {
-        filePath: string;
-        phoneColumn: string;
-        nameColumn?: string | null;
-      }) => Promise<ContactValidationResult>;
+      validateContactFile: (
+        options: {
+          filePath: string;
+          phoneColumn: string;
+          nameColumn?: string | null;
+        },
+      ) =>
+        Promise<ContactValidationResult>;
 
-      saveContactImport: (options: {
-        filePath: string;
-        phoneColumn: string;
-        nameColumn?: string | null;
-        sourceNote?: string | null;
-      }) => Promise<{
-        importId: string;
-        totalRows: number;
-        validRows: number;
-        invalidRows: number;
-        duplicateRows: number;
-      }>;
+      saveContactImport: (
+        options: {
+          filePath: string;
+          phoneColumn: string;
+          nameColumn?: string | null;
+          sourceNote?: string | null;
+        },
+      ) =>
+        Promise<{
+          importId: string;
+          totalRows: number;
+          validRows: number;
+          invalidRows: number;
+          duplicateRows: number;
+        }>;
 
-      listSavedImports: () => Promise<
-        Array<{
+      listSavedImports: () =>
+        Promise<
+          Array<{
+            id: string;
+            filename: string;
+            fileType: string;
+            importedAt: string;
+            totalRows: number;
+            validRows: number;
+            invalidRows: number;
+            duplicateRows: number;
+          }>
+        >;
+
+      getSavedImportDetails: (
+        importId: string,
+      ) =>
+        Promise<{
           id: string;
           filename: string;
           fileType: string;
@@ -62,41 +97,93 @@ declare global {
           validRows: number;
           invalidRows: number;
           duplicateRows: number;
-        }>
-      >;
 
-      getSavedImportDetails: (importId: string) => Promise<{
-        id: string;
-        filename: string;
-        fileType: string;
-        importedAt: string;
-        totalRows: number;
-        validRows: number;
-        invalidRows: number;
-        duplicateRows: number;
+          contacts: Array<{
+            id: string;
+            name: string;
+            originalPhone: string;
 
-        contacts: Array<{
-          id: string;
-          name: string;
-          originalPhone: string;
+            normalizedPhone:
+              | string
+              | null;
 
-          normalizedPhone: string | null;
+            validationStatus: string;
 
-          validationStatus: string;
+            validationReason:
+              | string
+              | null;
 
-          validationReason: string | null;
+            isDuplicate: boolean;
 
-          isDuplicate: boolean;
-
-          rowNumber: number | null;
+            rowNumber:
+              | number
+              | null;
+          }>;
         }>;
-      }>;
 
-      deleteSavedImport: (importId: string) => Promise<{
-        importId: string;
-        deletedContacts: number;
-        detachedCampaigns: number;
-      }>;
+      deleteSavedImport: (
+        importId: string,
+      ) =>
+        Promise<{
+          importId: string;
+          deletedContacts: number;
+          detachedCampaigns: number;
+        }>;
+
+      chooseCampaignAttachment: (
+        type:
+          | 'image'
+          | 'document',
+      ) =>
+        Promise<
+          | {
+              canceled: true;
+            }
+          | {
+              canceled: false;
+              filePath: string;
+              fileName: string;
+              extension: string;
+              sizeBytes: number;
+            }
+        >;
+
+      saveCampaignDraft: (
+        options: {
+          name: string;
+
+          description?: string | null;
+
+          importId: string;
+
+          messages: Array<{
+            type:
+              | 'text'
+              | 'image'
+              | 'image-caption'
+              | 'document'
+              | 'document-caption';
+
+            text?: string | null;
+
+            caption?: string | null;
+
+            filePath?: string | null;
+
+            fileName?: string | null;
+
+            fileExtension?: string | null;
+
+            fileSizeBytes?: number | null;
+          }>;
+        },
+      ) =>
+        Promise<{
+          campaignId: string;
+          recipientCount: number;
+          messageCount: number;
+          mediaCount: number;
+        }>;
     };
   }
 }
