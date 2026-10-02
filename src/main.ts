@@ -31,6 +31,7 @@ import {
 } from './services/imports/file-parser';
 
 import {
+  deleteSavedImport,
   getSavedImportDetails,
   listSavedImports,
   saveValidatedImport,
@@ -242,33 +243,41 @@ app.whenReady().then(() => {
     },
   );
 
+  /* -------------------------------------------------------
+     LIST SAVED IMPORTS
+     ------------------------------------------------------- */
+
   ipcMain.handle(
-  'imports:list',
-  () => {
-    return listSavedImports();
-  },
-);
+    'imports:list',
+    () => {
+      return listSavedImports();
+    },
+  );
 
-ipcMain.handle(
-  'imports:get-details',
-  (
-    _event,
-    importId: string,
-  ) => {
-    const result =
-      getSavedImportDetails(
-        importId,
-      );
+  /* -------------------------------------------------------
+     GET SAVED IMPORT DETAILS
+     ------------------------------------------------------- */
 
-    if (!result) {
-      throw new Error(
-        'Saved import was not found.',
-      );
-    }
+  ipcMain.handle(
+    'imports:get-details',
+    (
+      _event,
+      importId: string,
+    ) => {
+      const result =
+        getSavedImportDetails(
+          importId,
+        );
 
-    return result;
-  },
-);
+      if (!result) {
+        throw new Error(
+          'Saved import was not found.',
+        );
+      }
+
+      return result;
+    },
+  );
 
   /* -------------------------------------------------------
      VALIDATE CONTACT FILE
@@ -407,6 +416,22 @@ ipcMain.handle(
           options.sourceNote ??
           null,
       });
+    },
+  );
+
+  /* -------------------------------------------------------
+     DELETE SAVED IMPORT
+     ------------------------------------------------------- */
+
+  ipcMain.handle(
+    'imports:delete',
+    (
+      _event,
+      importId: string,
+    ) => {
+      return deleteSavedImport(
+        importId,
+      );
     },
   );
 

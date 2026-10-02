@@ -1,7 +1,9 @@
 import {
+  AlertTriangle,
   CheckCircle2,
   Eye,
   FileSpreadsheet,
+  Trash2,
   Upload,
   X,
   XCircle,
@@ -168,6 +170,34 @@ export function ImportContactsPage() {
     useState(false);
 
   /* =========================================================
+     DELETE STATE
+     ========================================================= */
+
+  const [
+    deleteTarget,
+    setDeleteTarget,
+  ] =
+    useState<SavedImportItem | null>(
+      null,
+    );
+
+  const [
+    deletingImportId,
+    setDeletingImportId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    deleteMessage,
+    setDeleteMessage,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  /* =========================================================
      LOAD SAVED IMPORTS
      ========================================================= */
 
@@ -239,6 +269,112 @@ export function ImportContactsPage() {
   }
 
   /* =========================================================
+     REQUEST DELETE
+     ========================================================= */
+
+  function requestDeleteImport(
+    savedImport: SavedImportItem,
+  ) {
+    setDeleteMessage(
+      null,
+    );
+
+    setDeleteTarget(
+      savedImport,
+    );
+  }
+
+  /* =========================================================
+     CONFIRM DELETE
+     ========================================================= */
+
+  async function confirmDeleteImport() {
+    if (!deleteTarget) {
+      return;
+    }
+
+    try {
+      setDeletingImportId(
+        deleteTarget.id,
+      );
+
+      setError(null);
+      setDeleteMessage(null);
+
+      const result =
+        await window.appAPI
+          .deleteSavedImport(
+            deleteTarget.id,
+          );
+
+      /*
+       * Close details if the deleted
+       * import is currently being viewed.
+       */
+      if (
+        selectedSavedImport?.id ===
+        deleteTarget.id
+      ) {
+        setSelectedSavedImport(
+          null,
+        );
+      }
+
+      /*
+       * If the import that was just saved
+       * is deleted, allow it to be saved
+       * again.
+       */
+      if (
+        savedImportId ===
+        deleteTarget.id
+      ) {
+        setSavedImportId(
+          null,
+        );
+
+        setSaveMessage(
+          null,
+        );
+      }
+
+      const contactText =
+        result.deletedContacts === 1
+          ? '1 stored contact row was removed.'
+          : `${result.deletedContacts} stored contact rows were removed.`;
+
+      const campaignText =
+        result.detachedCampaigns > 0
+          ? result.detachedCampaigns === 1
+            ? ' 1 existing campaign was detached from this import.'
+            : ` ${result.detachedCampaigns} existing campaigns were detached from this import.`
+          : '';
+
+      setDeleteMessage(
+        `Import deleted successfully. ${contactText}${campaignText}`,
+      );
+
+      setDeleteTarget(
+        null,
+      );
+
+      await loadSavedImports();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to delete the saved import.',
+      );
+    } finally {
+      setDeletingImportId(
+        null,
+      );
+    }
+  }
+
+  /* =========================================================
      LOAD IMPORTS WHEN PAGE OPENS
      ========================================================= */
 
@@ -261,6 +397,10 @@ export function ImportContactsPage() {
       );
 
       setSaveMessage(
+        null,
+      );
+
+      setDeleteMessage(
         null,
       );
 
@@ -410,10 +550,8 @@ export function ImportContactsPage() {
       setSaving(true);
 
       setError(null);
-
-      setSaveMessage(
-        null,
-      );
+      setSaveMessage(null);
+      setDeleteMessage(null);
 
       const result =
         await window.appAPI
@@ -468,6 +606,21 @@ export function ImportContactsPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {/* DELETE SUCCESS */}
+
+      {deleteMessage && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          <CheckCircle2
+            className="mt-0.5 shrink-0"
+            size={18}
+          />
+
+          <span>
+            {deleteMessage}
+          </span>
         </div>
       )}
 
@@ -547,7 +700,7 @@ export function ImportContactsPage() {
                   </th>
 
                   <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                    Action
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -556,80 +709,112 @@ export function ImportContactsPage() {
                 {savedImports.map(
                   (
                     savedImport,
-                  ) => (
-                    <tr
-                      key={
-                        savedImport.id
-                      }
-                    >
-                      <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
-                        {
-                          savedImport.filename
+                  ) => {
+                    const isDeleting =
+                      deletingImportId ===
+                      savedImport.id;
+
+                    return (
+                      <tr
+                        key={
+                          savedImport.id
                         }
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3 uppercase text-slate-500">
-                        {
-                          savedImport.fileType
-                        }
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3 text-slate-500">
-                        {new Date(
-                          savedImport
-                            .importedAt,
-                        ).toLocaleString()}
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3 text-slate-700">
-                        {
-                          savedImport.totalRows
-                        }
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3 font-semibold text-emerald-700">
-                        {
-                          savedImport.validRows
-                        }
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3 font-semibold text-red-700">
-                        {
-                          savedImport.invalidRows
-                        }
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3 font-semibold text-amber-700">
-                        {
-                          savedImport
-                            .duplicateRows
-                        }
-                      </td>
-
-                      <td className="whitespace-nowrap px-5 py-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void viewSavedImport(
-                              savedImport.id,
-                            )
+                      >
+                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                          {
+                            savedImport.filename
                           }
-                          disabled={
-                            loadingSavedImportDetails
-                          }
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Eye
-                            size={
-                              15
-                            }
-                          />
+                        </td>
 
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ),
+                        <td className="whitespace-nowrap px-5 py-3 uppercase text-slate-500">
+                          {
+                            savedImport.fileType
+                          }
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-3 text-slate-500">
+                          {new Date(
+                            savedImport
+                              .importedAt,
+                          ).toLocaleString()}
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-3 text-slate-700">
+                          {
+                            savedImport.totalRows
+                          }
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-3 font-semibold text-emerald-700">
+                          {
+                            savedImport.validRows
+                          }
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-3 font-semibold text-red-700">
+                          {
+                            savedImport.invalidRows
+                          }
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-3 font-semibold text-amber-700">
+                          {
+                            savedImport
+                              .duplicateRows
+                          }
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void viewSavedImport(
+                                  savedImport.id,
+                                )
+                              }
+                              disabled={
+                                isDeleting ||
+                                loadingSavedImportDetails
+                              }
+                              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Eye
+                                size={
+                                  15
+                                }
+                              />
+
+                              View
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                requestDeleteImport(
+                                  savedImport,
+                                )
+                              }
+                              disabled={
+                                isDeleting
+                              }
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Trash2
+                                size={
+                                  15
+                                }
+                              />
+
+                              {isDeleting
+                                ? 'Deleting...'
+                                : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  },
                 )}
               </tbody>
             </table>
@@ -682,7 +867,9 @@ export function ImportContactsPage() {
                 }
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
-                <X size={16} />
+                <X
+                  size={16}
+                />
 
                 Close Details
               </button>
@@ -839,20 +1026,6 @@ export function ImportContactsPage() {
                             'duplicate' && (
                             <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                               Duplicate
-                            </span>
-                          )}
-
-                          {![
-                            'valid',
-                            'invalid',
-                            'duplicate',
-                          ].includes(
-                            contact.validationStatus,
-                          ) && (
-                            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                              {
-                                contact.validationStatus
-                              }
                             </span>
                           )}
                         </td>
@@ -1027,17 +1200,6 @@ export function ImportContactsPage() {
                     ),
                   )}
                 </select>
-
-                {selectedFile
-                  .suggestedPhoneColumn && (
-                  <p className="mt-2 text-xs text-slate-400">
-                    Auto-detected:{' '}
-                    {
-                      selectedFile
-                        .suggestedPhoneColumn
-                    }
-                  </p>
-                )}
               </div>
 
               {/* NAME COLUMN */}
@@ -1096,17 +1258,6 @@ export function ImportContactsPage() {
                     ),
                   )}
                 </select>
-
-                {selectedFile
-                  .suggestedNameColumn && (
-                  <p className="mt-2 text-xs text-slate-400">
-                    Auto-detected:{' '}
-                    {
-                      selectedFile
-                        .suggestedNameColumn
-                    }
-                  </p>
-                )}
               </div>
             </div>
 
@@ -1138,16 +1289,13 @@ export function ImportContactsPage() {
             </div>
           </div>
 
-          {/* NO PHONE COLUMN */}
+          {/* NO PHONE */}
 
           {!selectedPhoneColumn && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-              A phone number column has
-              not been selected. Choose
-              the column containing
-              WhatsApp phone numbers
-              above to continue
-              validation.
+              Select the column containing
+              WhatsApp phone numbers to
+              continue validation.
             </div>
           )}
 
@@ -1156,8 +1304,6 @@ export function ImportContactsPage() {
           {validation &&
             selectedPhoneColumn && (
               <>
-                {/* SUMMARY */}
-
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -1166,8 +1312,7 @@ export function ImportContactsPage() {
 
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {
-                        validation
-                          .summary
+                        validation.summary
                           .totalRows
                       }
                     </p>
@@ -1180,8 +1325,7 @@ export function ImportContactsPage() {
 
                     <p className="mt-2 text-2xl font-bold text-emerald-700">
                       {
-                        validation
-                          .summary
+                        validation.summary
                           .validRows
                       }
                     </p>
@@ -1194,8 +1338,7 @@ export function ImportContactsPage() {
 
                     <p className="mt-2 text-2xl font-bold text-red-700">
                       {
-                        validation
-                          .summary
+                        validation.summary
                           .invalidRows
                       }
                     </p>
@@ -1208,8 +1351,7 @@ export function ImportContactsPage() {
 
                     <p className="mt-2 text-2xl font-bold text-amber-700">
                       {
-                        validation
-                          .summary
+                        validation.summary
                           .duplicateRows
                       }
                     </p>
@@ -1223,42 +1365,33 @@ export function ImportContactsPage() {
                     <h3 className="text-base font-semibold text-slate-900">
                       Contact Validation
                     </h3>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      Phone numbers are
-                      normalized to the
-                      +94 format before
-                      campaign creation.
-                    </p>
                   </div>
 
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          <th className="px-5 py-3 font-semibold text-slate-600">
                             Row
                           </th>
 
-                          <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          <th className="px-5 py-3 font-semibold text-slate-600">
                             Name
                           </th>
 
-                          <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                            Original
-                            Phone
+                          <th className="px-5 py-3 font-semibold text-slate-600">
+                            Original Phone
                           </th>
 
-                          <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
-                            Normalized
-                            Phone
+                          <th className="px-5 py-3 font-semibold text-slate-600">
+                            Normalized Phone
                           </th>
 
-                          <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          <th className="px-5 py-3 font-semibold text-slate-600">
                             Status
                           </th>
 
-                          <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+                          <th className="px-5 py-3 font-semibold text-slate-600">
                             Reason
                           </th>
                         </tr>
@@ -1274,23 +1407,23 @@ export function ImportContactsPage() {
                                 contact.rowNumber
                               }
                             >
-                              <td className="whitespace-nowrap px-5 py-3 text-slate-500">
+                              <td className="px-5 py-3 text-slate-500">
                                 {
                                   contact.rowNumber
                                 }
                               </td>
 
-                              <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                              <td className="px-5 py-3 font-medium text-slate-800">
                                 {contact.name ||
                                   '—'}
                               </td>
 
-                              <td className="whitespace-nowrap px-5 py-3 text-slate-700">
+                              <td className="px-5 py-3 text-slate-700">
                                 {contact.originalPhone ||
                                   '—'}
                               </td>
 
-                              <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                              <td className="px-5 py-3 font-medium text-slate-800">
                                 {contact.normalizedPhone ??
                                   '—'}
                               </td>
@@ -1298,33 +1431,21 @@ export function ImportContactsPage() {
                               <td className="px-5 py-3">
                                 {contact.status ===
                                   'valid' && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                    <CheckCircle2
-                                      size={
-                                        14
-                                      }
-                                    />
-
+                                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                     Valid
                                   </span>
                                 )}
 
                                 {contact.status ===
                                   'invalid' && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                                    <XCircle
-                                      size={
-                                        14
-                                      }
-                                    />
-
+                                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
                                     Invalid
                                   </span>
                                 )}
 
                                 {contact.status ===
                                   'duplicate' && (
-                                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                                     Duplicate
                                   </span>
                                 )}
@@ -1351,14 +1472,10 @@ export function ImportContactsPage() {
                         Confirm Import
                       </h3>
 
-                      <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                        Save this
-                        contact import
-                        locally. Valid,
-                        duplicate and
-                        invalid rows are
-                        retained for
-                        reference.
+                      <p className="mt-1 text-sm text-slate-500">
+                        Save this participant
+                        list locally for use in
+                        campaigns.
                       </p>
                     </div>
 
@@ -1372,12 +1489,10 @@ export function ImportContactsPage() {
                         Boolean(
                           savedImportId,
                         ) ||
-                        validation
-                          .summary
-                          .validRows ===
-                          0
+                        validation.summary
+                          .validRows === 0
                       }
-                      className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {saving
                         ? 'Saving...'
@@ -1390,9 +1505,7 @@ export function ImportContactsPage() {
                   {saveMessage && (
                     <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
                       <CheckCircle2
-                        size={
-                          18
-                        }
+                        size={18}
                       />
 
                       {
@@ -1400,31 +1513,109 @@ export function ImportContactsPage() {
                       }
                     </div>
                   )}
-
-                  {validation
-                    .summary
-                    .validRows ===
-                    0 && (
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                      At least one
-                      valid contact is
-                      required before
-                      this import can
-                      be saved.
-                    </div>
-                  )}
-
-                  {savedImportId && (
-                    <p className="mt-3 text-xs text-slate-400">
-                      Import ID:{' '}
-                      {
-                        savedImportId
-                      }
-                    </p>
-                  )}
                 </div>
               </>
             )}
+        </div>
+      )}
+
+      {/* =====================================================
+          DELETE CONFIRMATION MODAL
+          ===================================================== */}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+
+            <div className="flex items-start gap-4 border-b border-slate-200 p-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50">
+                <AlertTriangle
+                  className="text-red-600"
+                  size={22}
+                />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Delete Saved Import?
+                </h3>
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  This will permanently
+                  delete the saved import
+                  and its stored contact
+                  rows.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  {
+                    deleteTarget.filename
+                  }
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  {
+                    deleteTarget.totalRows
+                  }{' '}
+                  rows •{' '}
+                  {
+                    deleteTarget.validRows
+                  }{' '}
+                  valid
+                </p>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                Existing campaigns will
+                not be deleted. If a
+                campaign references this
+                import, the relationship
+                will be detached.
+              </p>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeleteTarget(
+                      null,
+                    )
+                  }
+                  disabled={
+                    deletingImportId !==
+                    null
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void confirmDeleteImport()
+                  }
+                  disabled={
+                    deletingImportId !==
+                    null
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2
+                    size={16}
+                  />
+
+                  {deletingImportId
+                    ? 'Deleting...'
+                    : 'Delete Import'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </>

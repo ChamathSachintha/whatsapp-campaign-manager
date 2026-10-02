@@ -120,6 +120,15 @@ declare global {
               | null;
           }>;
         }>;
+
+      deleteSavedImport: (
+        importId: string,
+      ) =>
+        Promise<{
+          importId: string;
+          deletedContacts: number;
+          detachedCampaigns: number;
+        }>;
     };
   }
 }

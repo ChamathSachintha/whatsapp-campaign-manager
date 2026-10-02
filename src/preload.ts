@@ -46,17 +46,25 @@ contextBridge.exposeInMainWorld(
         options,
       ),
 
-      listSavedImports: () =>
-  ipcRenderer.invoke(
-    'imports:list',
-  ),
+    listSavedImports: () =>
+      ipcRenderer.invoke(
+        'imports:list',
+      ),
 
-  getSavedImportDetails: (
-  importId: string,
-) =>
-  ipcRenderer.invoke(
-    'imports:get-details',
-    importId,
-  ),
+    getSavedImportDetails: (
+      importId: string,
+    ) =>
+      ipcRenderer.invoke(
+        'imports:get-details',
+        importId,
+      ),
+
+    deleteSavedImport: (
+      importId: string,
+    ) =>
+      ipcRenderer.invoke(
+        'imports:delete',
+        importId,
+      ),
   },
 );

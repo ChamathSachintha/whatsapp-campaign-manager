@@ -39,6 +39,12 @@ export type SavedImportDetails = {
   contacts: SavedImportContact[];
 };
 
+export type DeleteSavedImportResult = {
+  importId: string;
+  deletedContacts: number;
+  detachedCampaigns: number;
+};
+
 import {
   getDatabase,
 } from '../../db/database';
@@ -445,5 +451,105 @@ export function getSavedImportDetails(
             row.row_number,
         }),
       ),
+  };
+}
+
+export function deleteSavedImport(
+  importId: string,
+): DeleteSavedImportResult {
+  const db =
+    getDatabase();
+
+  const existingImport =
+    db.prepare(`
+      SELECT id
+      FROM imports
+      WHERE id = ?
+      LIMIT 1
+    `).get(
+      importId,
+    ) as
+      | {
+          id: string;
+        }
+      | undefined;
+
+  if (!existingImport) {
+    throw new Error(
+      'Saved import was not found.',
+    );
+  }
+
+  const contactCountRow =
+    db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM import_contacts
+      WHERE import_id = ?
+    `).get(
+      importId,
+    ) as {
+      count: number;
+    };
+
+  const campaignCountRow =
+    db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM campaigns
+      WHERE import_id = ?
+    `).get(
+      importId,
+    ) as {
+      count: number;
+    };
+
+  const deletedContacts =
+    Number(
+      contactCountRow.count,
+    );
+
+  const detachedCampaigns =
+    Number(
+      campaignCountRow.count,
+    );
+
+  try {
+    db.exec(
+      'BEGIN IMMEDIATE TRANSACTION;',
+    );
+
+    /*
+     * Because of the database foreign keys:
+     *
+     * import_contacts
+     *   -> ON DELETE CASCADE
+     *
+     * campaigns
+     *   -> ON DELETE SET NULL
+     *
+     * deleting the import safely handles
+     * both relationships automatically.
+     */
+    db.prepare(`
+      DELETE FROM imports
+      WHERE id = ?
+    `).run(
+      importId,
+    );
+
+    db.exec('COMMIT;');
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK;');
+    } catch {
+      // Ignore rollback failure.
+    }
+
+    throw error;
+  }
+
+  return {
+    importId,
+    deletedContacts,
+    detachedCampaigns,
   };
 }
