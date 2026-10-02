@@ -6,6 +6,9 @@ import {
 } from 'electron';
 import path from 'node:path';
 import { parseContactFile } from './services/imports/file-parser';
+import {
+  detectContactColumns,
+} from './services/imports/column-detector';
 import started from 'electron-squirrel-startup';
 import {
   closeDatabase,
@@ -74,23 +77,24 @@ app.whenReady().then(() => {
   ipcMain.handle(
   'imports:choose-file',
   async () => {
-    const result = await dialog.showOpenDialog({
-      title: 'Choose Contact File',
+    const result =
+      await dialog.showOpenDialog({
+        title: 'Choose Contact File',
 
-      properties: ['openFile'],
+        properties: ['openFile'],
 
-      filters: [
-        {
-          name: 'Contact Files',
-          extensions: [
-            'csv',
-            'md',
-            'xlsx',
-            'xls',
-          ],
-        },
-      ],
-    });
+        filters: [
+          {
+            name: 'Contact Files',
+            extensions: [
+              'csv',
+              'md',
+              'xlsx',
+              'xls',
+            ],
+          },
+        ],
+      });
 
     if (
       result.canceled ||
@@ -101,21 +105,37 @@ app.whenReady().then(() => {
       };
     }
 
-    const filePath = result.filePaths[0];
+    const filePath =
+      result.filePaths[0];
 
     const parsed =
       parseContactFile(filePath);
+
+    const detectedColumns =
+      detectContactColumns(
+        parsed.columns,
+        parsed.rows,
+      );
 
     return {
       canceled: false,
 
       filePath,
 
-      fileName: parsed.fileName,
+      fileName:
+        parsed.fileName,
 
-      fileType: parsed.fileType,
+      fileType:
+        parsed.fileType,
 
-      columns: parsed.columns,
+      columns:
+        parsed.columns,
+
+      suggestedPhoneColumn:
+        detectedColumns.phoneColumn,
+
+      suggestedNameColumn:
+        detectedColumns.nameColumn,
 
       sampleRows:
         parsed.rows.slice(0, 5),
