@@ -106,4 +106,27 @@ contextBridge.exposeInMainWorld('appAPI', {
 
   deleteCampaign: (campaignId: string) =>
     ipcRenderer.invoke('campaigns:delete', campaignId),
+
+  queueCampaignNow: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:queue-now', campaignId),
+
+  scheduleCampaign: (options: {
+    campaignId: string;
+
+    scheduledLocalDateTime: string;
+  }) => ipcRenderer.invoke('campaigns:schedule', options),
+
+  rescheduleCampaign: (options: {
+    campaignId: string;
+
+    scheduledLocalDateTime: string;
+  }) => ipcRenderer.invoke('campaigns:reschedule', options),
+
+  cancelCampaignSchedule: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:cancel-schedule', campaignId),
+
+  returnQueuedCampaignToDraft: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:return-to-draft', campaignId),
+
+  listScheduledCampaigns: () => ipcRenderer.invoke('campaigns:list-scheduled'),
 });

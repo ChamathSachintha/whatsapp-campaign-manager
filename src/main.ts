@@ -11,13 +11,25 @@ import { getDatabaseHealth } from './db/health';
 import { chooseCampaignAttachment } from './services/campaigns/media-picker';
 
 import {
+  cancelCampaignSchedule,
   deleteCampaignDraft,
   getCampaignMediaPreview,
   getSavedCampaignDetails,
   listSavedCampaigns,
+  listScheduledCampaigns,
+  processDueCampaigns,
+  queueCampaignNow,
+  rescheduleCampaign,
+  returnQueuedCampaignToDraft,
   saveCampaignDraft,
+  scheduleCampaign,
   updateCampaignDraft,
 } from './services/campaigns/campaign-repository';
+
+import {
+  startCampaignScheduler,
+  stopCampaignScheduler,
+} from './services/campaigns/campaign-scheduler';
 
 import { detectContactColumns } from './services/imports/column-detector';
 
@@ -33,19 +45,12 @@ import {
 } from './services/imports/import-repository';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
-declare const MAIN_WINDOW_VITE_NAME: string;
 
-/* =========================================================
-   SQUIRREL
-   ========================================================= */
+declare const MAIN_WINDOW_VITE_NAME: string;
 
 if (started) {
   app.quit();
 }
-
-/* =========================================================
-   WINDOW
-   ========================================================= */
 
 const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
@@ -89,22 +94,12 @@ const createWindow = (): void => {
   });
 };
 
-/* =========================================================
-   APP READY
-   ========================================================= */
-
 app.whenReady().then(() => {
   initializeDatabase();
 
-  /* -------------------------------------------------------
-       DATABASE
-       ------------------------------------------------------- */
+  startCampaignScheduler();
 
   ipcMain.handle('database:get-health', () => getDatabaseHealth());
-
-  /* -------------------------------------------------------
-       IMPORTS - CHOOSE FILE
-       ------------------------------------------------------- */
 
   ipcMain.handle('imports:choose-file', async () => {
     const result = await dialog.showOpenDialog({
@@ -164,15 +159,7 @@ app.whenReady().then(() => {
     };
   });
 
-  /* -------------------------------------------------------
-       IMPORTS - LIST
-       ------------------------------------------------------- */
-
   ipcMain.handle('imports:list', () => listSavedImports());
-
-  /* -------------------------------------------------------
-       IMPORTS - DETAILS
-       ------------------------------------------------------- */
 
   ipcMain.handle('imports:get-details', (_event, importId: string) => {
     const result = getSavedImportDetails(importId);
@@ -183,10 +170,6 @@ app.whenReady().then(() => {
 
     return result;
   });
-
-  /* -------------------------------------------------------
-       IMPORTS - VALIDATE
-       ------------------------------------------------------- */
 
   ipcMain.handle(
     'imports:validate-file',
@@ -220,10 +203,6 @@ app.whenReady().then(() => {
       });
     },
   );
-
-  /* -------------------------------------------------------
-       IMPORTS - SAVE
-       ------------------------------------------------------- */
 
   ipcMain.handle(
     'imports:save',
@@ -272,17 +251,9 @@ app.whenReady().then(() => {
     },
   );
 
-  /* -------------------------------------------------------
-       IMPORTS - DELETE
-       ------------------------------------------------------- */
-
   ipcMain.handle('imports:delete', (_event, importId: string) =>
     deleteSavedImport(importId),
   );
-
-  /* -------------------------------------------------------
-       CAMPAIGN ATTACHMENT PICKER
-       ------------------------------------------------------- */
 
   ipcMain.handle(
     'campaigns:choose-attachment',
@@ -299,55 +270,16 @@ app.whenReady().then(() => {
     },
   );
 
-  /* -------------------------------------------------------
-       CAMPAIGNS - SAVE DRAFT
-       ------------------------------------------------------- */
-
   ipcMain.handle(
     'campaigns:save-draft',
     (
       _event,
 
-      options: {
-        name: string;
-
-        description?: string | null;
-
-        importId: string;
-
-        messages: Array<{
-          type:
-            | 'text'
-            | 'image'
-            | 'image-caption'
-            | 'document'
-            | 'document-caption';
-
-          text?: string | null;
-
-          caption?: string | null;
-
-          filePath?: string | null;
-
-          fileName?: string | null;
-
-          fileExtension?: string | null;
-
-          fileSizeBytes?: number | null;
-        }>;
-      },
+      options: Parameters<typeof saveCampaignDraft>[0],
     ) => saveCampaignDraft(options),
   );
 
-  /* -------------------------------------------------------
-       CAMPAIGNS - LIST
-       ------------------------------------------------------- */
-
   ipcMain.handle('campaigns:list', () => listSavedCampaigns());
-
-  /* -------------------------------------------------------
-       CAMPAIGNS - DETAILS
-       ------------------------------------------------------- */
 
   ipcMain.handle('campaigns:get-details', (_event, campaignId: string) => {
     const result = getSavedCampaignDetails(campaignId);
@@ -359,68 +291,67 @@ app.whenReady().then(() => {
     return result;
   });
 
-  /* -------------------------------------------------------
-       CAMPAIGNS - IMAGE PREVIEW
-       ------------------------------------------------------- */
-
   ipcMain.handle(
     'campaigns:get-media-preview',
     (_event, mediaAssetId: string) => getCampaignMediaPreview(mediaAssetId),
   );
-
-  /* -------------------------------------------------------
-       CAMPAIGNS - UPDATE DRAFT
-       ------------------------------------------------------- */
 
   ipcMain.handle(
     'campaigns:update-draft',
     (
       _event,
 
-      options: {
-        campaignId: string;
-
-        name: string;
-
-        description?: string | null;
-
-        messages: Array<{
-          type:
-            | 'text'
-            | 'image'
-            | 'image-caption'
-            | 'document'
-            | 'document-caption';
-
-          text?: string | null;
-
-          caption?: string | null;
-
-          filePath?: string | null;
-
-          fileName?: string | null;
-
-          fileExtension?: string | null;
-
-          fileSizeBytes?: number | null;
-
-          existingMediaAssetId?: string | null;
-        }>;
-      },
+      options: Parameters<typeof updateCampaignDraft>[0],
     ) => updateCampaignDraft(options),
   );
-
-  /* -------------------------------------------------------
-       CAMPAIGNS - DELETE
-       ------------------------------------------------------- */
 
   ipcMain.handle('campaigns:delete', (_event, campaignId: string) =>
     deleteCampaignDraft(campaignId),
   );
 
-  /* -------------------------------------------------------
-       VERSION
-       ------------------------------------------------------- */
+  ipcMain.handle('campaigns:queue-now', (_event, campaignId: string) =>
+    queueCampaignNow(campaignId),
+  );
+
+  ipcMain.handle(
+    'campaigns:schedule',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      },
+    ) => scheduleCampaign(options.campaignId, options.scheduledLocalDateTime),
+  );
+
+  ipcMain.handle(
+    'campaigns:reschedule',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      },
+    ) => rescheduleCampaign(options.campaignId, options.scheduledLocalDateTime),
+  );
+
+  ipcMain.handle('campaigns:cancel-schedule', (_event, campaignId: string) =>
+    cancelCampaignSchedule(campaignId),
+  );
+
+  ipcMain.handle('campaigns:return-to-draft', (_event, campaignId: string) =>
+    returnQueuedCampaignToDraft(campaignId),
+  );
+
+  ipcMain.handle('campaigns:list-scheduled', () => {
+    processDueCampaigns();
+
+    return listScheduledCampaigns();
+  });
 
   ipcMain.handle('app:get-version', () => app.getVersion());
 
@@ -433,10 +364,6 @@ app.whenReady().then(() => {
   });
 });
 
-/* =========================================================
-   CLOSE
-   ========================================================= */
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
@@ -444,5 +371,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  stopCampaignScheduler();
+
   closeDatabase();
 });

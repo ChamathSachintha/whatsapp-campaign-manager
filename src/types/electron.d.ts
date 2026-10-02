@@ -323,6 +323,90 @@ declare global {
 
         deletedMedia: number;
       }>;
+
+      queueCampaignNow: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+
+        sendMode: string;
+
+        scheduledAt: null;
+
+        timezone: string;
+      }>;
+
+      scheduleCampaign: (options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      }) => Promise<{
+        campaignId: string;
+
+        status: string;
+
+        sendMode: string;
+
+        scheduledAt: string;
+
+        timezone: string;
+      }>;
+
+      rescheduleCampaign: (options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      }) => Promise<{
+        campaignId: string;
+
+        status: string;
+
+        sendMode: string;
+
+        scheduledAt: string;
+
+        timezone: string;
+      }>;
+
+      cancelCampaignSchedule: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      returnQueuedCampaignToDraft: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      listScheduledCampaigns: () => Promise<
+        Array<{
+          id: string;
+
+          name: string;
+
+          description: string | null;
+
+          status: string;
+
+          sendMode: string;
+
+          timezone: string;
+
+          scheduledAt: string | null;
+
+          createdAt: string;
+
+          updatedAt: string;
+
+          recipientCount: number;
+
+          messageCount: number;
+
+          mediaCount: number;
+        }>
+      >;
     };
   }
 }
