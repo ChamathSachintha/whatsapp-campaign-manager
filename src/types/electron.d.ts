@@ -70,6 +70,20 @@ declare global {
           invalidRows: number;
           duplicateRows: number;
         }>;
+
+        listSavedImports: () =>
+  Promise<
+    Array<{
+      id: string;
+      filename: string;
+      fileType: string;
+      importedAt: string;
+      totalRows: number;
+      validRows: number;
+      invalidRows: number;
+      duplicateRows: number;
+    }>
+  >;
     };
   }
 }

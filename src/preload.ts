@@ -45,5 +45,10 @@ contextBridge.exposeInMainWorld(
         'imports:save',
         options,
       ),
+
+      listSavedImports: () =>
+  ipcRenderer.invoke(
+    'imports:list',
+  ),
   },
 );

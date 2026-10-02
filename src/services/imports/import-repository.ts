@@ -5,6 +5,17 @@ import {
   randomUUID,
 } from 'node:crypto';
 
+export type SavedImportListItem = {
+  id: string;
+  filename: string;
+  fileType: string;
+  importedAt: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+};
+
 import {
   getDatabase,
 } from '../../db/database';
@@ -219,4 +230,64 @@ export function saveValidatedImport(
 
     duplicateRows,
   };
+}
+
+export function listSavedImports():
+  SavedImportListItem[] {
+  const db =
+    getDatabase();
+
+  const statement =
+    db.prepare(`
+      SELECT
+        id,
+        filename,
+        file_type,
+        imported_at,
+        total_rows,
+        valid_rows,
+        invalid_rows,
+        duplicate_rows
+      FROM imports
+      ORDER BY imported_at DESC
+    `);
+
+  const rows =
+    statement.all() as Array<{
+      id: string;
+      filename: string;
+      file_type: string;
+      imported_at: string;
+      total_rows: number;
+      valid_rows: number;
+      invalid_rows: number;
+      duplicate_rows: number;
+    }>;
+
+  return rows.map(
+    (row) => ({
+      id: row.id,
+
+      filename:
+        row.filename,
+
+      fileType:
+        row.file_type,
+
+      importedAt:
+        row.imported_at,
+
+      totalRows:
+        row.total_rows,
+
+      validRows:
+        row.valid_rows,
+
+      invalidRows:
+        row.invalid_rows,
+
+      duplicateRows:
+        row.duplicate_rows,
+    }),
+  );
 }

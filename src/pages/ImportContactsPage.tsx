@@ -5,13 +5,28 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 
 import { PageHeader } from '../components/PageHeader';
 
 import type {
   ContactFileInspection,
 } from '../types/imports';
+
+
+type SavedImportItem = {
+  id: string;
+  filename: string;
+  fileType: string;
+  importedAt: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+};
 
 export function ImportContactsPage() {
   const [
@@ -56,6 +71,37 @@ export function ImportContactsPage() {
     saveMessage,
     setSaveMessage,
   ] = useState<string | null>(null);
+
+  const [
+  savedImports,
+  setSavedImports,
+] = useState<SavedImportItem[]>([]);
+
+const [
+  loadingSavedImports,
+  setLoadingSavedImports,
+] = useState(false);
+
+async function loadSavedImports() {
+  try {
+    setLoadingSavedImports(true);
+
+    const imports =
+      await window.appAPI.listSavedImports();
+
+    setSavedImports(imports);
+  } catch (err) {
+    console.error(
+      'Unable to load saved imports:',
+      err,
+    );
+  } finally {
+    setLoadingSavedImports(false);
+  }
+}
+useEffect(() => {
+  void loadSavedImports();
+}, []);
 
   /* =========================================================
      CHOOSE FILE
@@ -193,6 +239,7 @@ export function ImportContactsPage() {
       setSavedImportId(
         result.importId,
       );
+      await loadSavedImports();
 
       setSaveMessage(
         `Import saved successfully. ${result.validRows} valid contacts are ready.`,
@@ -224,6 +271,119 @@ export function ImportContactsPage() {
           {error}
         </div>
       )}
+
+      {/* SAVED IMPORTS */}
+
+<div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div className="border-b border-slate-200 p-6">
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h3 className="text-base font-semibold text-slate-900">
+          Saved Imports
+        </h3>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Previously imported participant
+          lists stored in this application.
+        </p>
+      </div>
+
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+        {savedImports.length}{' '}
+        {savedImports.length === 1
+          ? 'Import'
+          : 'Imports'}
+      </span>
+    </div>
+  </div>
+
+  {loadingSavedImports ? (
+    <div className="p-6 text-sm text-slate-500">
+      Loading saved imports...
+    </div>
+  ) : savedImports.length === 0 ? (
+    <div className="p-6 text-sm text-slate-500">
+      No contact imports have been saved yet.
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-left text-sm">
+        <thead className="bg-slate-50">
+          <tr>
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+              File
+            </th>
+
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+              Type
+            </th>
+
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+              Imported
+            </th>
+
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
+              Total
+            </th>
+
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-emerald-700">
+              Valid
+            </th>
+
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-red-700">
+              Invalid
+            </th>
+
+            <th className="whitespace-nowrap px-5 py-3 font-semibold text-amber-700">
+              Duplicates
+            </th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-slate-100">
+          {savedImports.map(
+            (savedImport) => (
+              <tr key={savedImport.id}>
+                <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">
+                  {savedImport.filename}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-3 uppercase text-slate-500">
+                  {savedImport.fileType}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-3 text-slate-500">
+                  {new Date(
+                    savedImport.importedAt,
+                  ).toLocaleString()}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-3 text-slate-700">
+                  {savedImport.totalRows}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-3 font-semibold text-emerald-700">
+                  {savedImport.validRows}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-3 font-semibold text-red-700">
+                  {savedImport.invalidRows}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-3 font-semibold text-amber-700">
+                  {
+                    savedImport
+                      .duplicateRows
+                  }
+                </td>
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
 
       {/* FILE PICKER */}
 

@@ -31,6 +31,7 @@ import {
 } from './services/imports/file-parser';
 
 import {
+  listSavedImports,
   saveValidatedImport,
 } from './services/imports/import-repository';
 
@@ -239,6 +240,13 @@ app.whenReady().then(() => {
       };
     },
   );
+
+  ipcMain.handle(
+  'imports:list',
+  () => {
+    return listSavedImports();
+  },
+);
 
   /* -------------------------------------------------------
      VALIDATE CONTACT FILE
