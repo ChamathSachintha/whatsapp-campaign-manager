@@ -15,10 +15,6 @@ import path from 'node:path';
 
 import { getDatabase } from '../../db/database';
 
-/* =========================================================
-   TYPES
-   ========================================================= */
-
 export type CampaignDraftMessageType =
   | 'text'
   | 'image'
@@ -190,9 +186,35 @@ export type CampaignMediaPreview = {
   dataUrl: string;
 };
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
+export type ScheduledCampaignListItem = {
+  id: string;
+
+  name: string;
+
+  description: string | null;
+
+  status: string;
+
+  sendMode: string;
+
+  timezone: string;
+
+  scheduledAt: string | null;
+
+  createdAt: string;
+
+  updatedAt: string;
+
+  recipientCount: number;
+
+  messageCount: number;
+
+  mediaCount: number;
+};
+
+const CAMPAIGN_TIMEZONE = 'Asia/Colombo';
+
+const COLOMBO_OFFSET = '+05:30';
 
 function getMimeType(extension: string): string {
   const ext = extension.replace('.', '').toLowerCase();
@@ -360,16 +382,7 @@ function storeMediaAsset(
       sha256,
       created_at
     )
-    VALUES (
-      ?,
-      ?,
-      ?,
-      ?,
-      ?,
-      ?,
-      ?,
-      ?
-    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     mediaAssetId,
     originalFilename,
@@ -384,8 +397,87 @@ function storeMediaAsset(
   return mediaAssetId;
 }
 
+function assertCampaignReadyForDelivery(
+  campaignId: string,
+  allowedStatuses: string[],
+) {
+  const db = getDatabase();
+
+  const campaign = db
+    .prepare(`
+      SELECT
+        c.id,
+        c.status,
+
+        (
+          SELECT COUNT(*)
+          FROM campaign_messages cm
+          WHERE cm.campaign_id = c.id
+        ) AS message_count,
+
+        (
+          SELECT COUNT(*)
+          FROM campaign_recipients cr
+          WHERE cr.campaign_id = c.id
+        ) AS recipient_count
+
+      FROM campaigns c
+      WHERE c.id = ?
+      LIMIT 1
+    `)
+    .get(campaignId) as
+    | {
+        id: string;
+
+        status: string;
+
+        message_count: number;
+
+        recipient_count: number;
+      }
+    | undefined;
+
+  if (!campaign) {
+    throw new Error('Campaign was not found.');
+  }
+
+  if (!allowedStatuses.includes(campaign.status)) {
+    throw new Error(
+      `Campaign cannot perform this delivery action while status is "${campaign.status}".`,
+    );
+  }
+
+  if (Number(campaign.message_count) < 1) {
+    throw new Error('Campaign must contain at least one message.');
+  }
+
+  if (Number(campaign.recipient_count) < 1) {
+    throw new Error('Campaign must contain at least one recipient.');
+  }
+
+  return campaign;
+}
+
+function colomboLocalDateTimeToUtc(localDateTime: string) {
+  const value = localDateTime.trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) {
+    throw new Error('Scheduled date and time are invalid.');
+  }
+
+  const withSeconds = value.length === 19 ? value : `${value}:00`;
+
+  const date = new Date(`${withSeconds}${COLOMBO_OFFSET}`);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Scheduled date and time are invalid.');
+  }
+
+  return date.toISOString();
+}
+
 /* =========================================================
-   SAVE NEW DRAFT
+   SAVE DRAFT
    ========================================================= */
 
 export function saveCampaignDraft(
@@ -523,17 +615,7 @@ export function saveCampaignDraft(
         created_at,
         updated_at
       )
-      VALUES (
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?
-      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
   const insertRecipient = db.prepare(`
@@ -625,7 +707,7 @@ export function saveCampaignDraft(
     try {
       db.exec('ROLLBACK;');
     } catch {
-      // Ignore rollback error.
+      // Ignore rollback errors.
     }
 
     copiedFiles.forEach(removeFileQuietly);
@@ -636,7 +718,7 @@ export function saveCampaignDraft(
         force: true,
       });
     } catch {
-      // Ignore cleanup error.
+      // Ignore cleanup errors.
     }
 
     throw error;
@@ -735,7 +817,7 @@ export function listSavedCampaigns(): SavedCampaignListItem[] {
 }
 
 /* =========================================================
-   FULL CAMPAIGN DETAILS
+   DETAILS
    ========================================================= */
 
 export function getSavedCampaignDetails(
@@ -808,18 +890,13 @@ export function getSavedCampaignDetails(
         cm.text_content,
         cm.caption,
         cm.media_asset_id,
-
         ma.original_filename,
         ma.mime_type,
         ma.file_size
-
       FROM campaign_messages cm
-
       LEFT JOIN media_assets ma
         ON ma.id = cm.media_asset_id
-
       WHERE cm.campaign_id = ?
-
       ORDER BY cm.position ASC
     `)
     .all(campaignId) as Array<{
@@ -934,7 +1011,7 @@ export function getSavedCampaignDetails(
 }
 
 /* =========================================================
-   IMAGE PREVIEW
+   MEDIA PREVIEW
    ========================================================= */
 
 export function getCampaignMediaPreview(
@@ -1027,6 +1104,7 @@ export function updateCampaignDraft(
     .get(options.campaignId) as
     | {
         id: string;
+
         status: string;
       }
     | undefined;
@@ -1051,6 +1129,7 @@ export function updateCampaignDraft(
     `)
     .all(options.campaignId) as Array<{
     id: string;
+
     local_path: string;
   }>;
 
@@ -1087,17 +1166,7 @@ export function updateCampaignDraft(
         created_at,
         updated_at
       )
-      VALUES (
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?
-      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
   try {
@@ -1183,16 +1252,13 @@ export function updateCampaignDraft(
 
   filesToRemove.forEach(removeFileQuietly);
 
-  const mediaCount = options.messages.filter(
-    (message) => message.type !== 'text',
-  ).length;
-
   return {
     campaignId: options.campaignId,
 
     messageCount: options.messages.length,
 
-    mediaCount,
+    mediaCount: options.messages.filter((message) => message.type !== 'text')
+      .length,
   };
 }
 
@@ -1215,6 +1281,7 @@ export function deleteCampaignDraft(campaignId: string): DeleteCampaignResult {
     .get(campaignId) as
     | {
         id: string;
+
         status: string;
       }
     | undefined;
@@ -1259,6 +1326,7 @@ export function deleteCampaignDraft(campaignId: string): DeleteCampaignResult {
     `)
     .all(campaignId) as Array<{
     id: string;
+
     local_path: string;
   }>;
 
@@ -1311,4 +1379,375 @@ export function deleteCampaignDraft(campaignId: string): DeleteCampaignResult {
 
     deletedMedia: mediaRows.length,
   };
+}
+
+/* =========================================================
+   QUEUE NOW
+   ========================================================= */
+
+export function queueCampaignNow(campaignId: string) {
+  const db = getDatabase();
+
+  assertCampaignReadyForDelivery(campaignId, ['draft', 'scheduled']);
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE campaigns
+    SET
+      status = 'queued',
+      send_mode = 'now',
+      timezone = ?,
+      scheduled_at = NULL,
+      updated_at = ?
+    WHERE id = ?
+  `).run(CAMPAIGN_TIMEZONE, now, campaignId);
+
+  return {
+    campaignId,
+
+    status: 'queued',
+
+    sendMode: 'now',
+
+    scheduledAt: null,
+
+    timezone: CAMPAIGN_TIMEZONE,
+  };
+}
+
+/* =========================================================
+   SCHEDULE
+   ========================================================= */
+
+export function scheduleCampaign(
+  campaignId: string,
+  scheduledLocalDateTime: string,
+) {
+  const db = getDatabase();
+
+  assertCampaignReadyForDelivery(campaignId, ['draft']);
+
+  const scheduledAt = colomboLocalDateTimeToUtc(scheduledLocalDateTime);
+
+  if (new Date(scheduledAt).getTime() <= Date.now()) {
+    throw new Error('Scheduled time must be in the future.');
+  }
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE campaigns
+    SET
+      status = 'scheduled',
+      send_mode = 'scheduled',
+      timezone = ?,
+      scheduled_at = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).run(CAMPAIGN_TIMEZONE, scheduledAt, now, campaignId);
+
+  return {
+    campaignId,
+
+    status: 'scheduled',
+
+    sendMode: 'scheduled',
+
+    scheduledAt,
+
+    timezone: CAMPAIGN_TIMEZONE,
+  };
+}
+
+/* =========================================================
+   RESCHEDULE
+   ========================================================= */
+
+export function rescheduleCampaign(
+  campaignId: string,
+  scheduledLocalDateTime: string,
+) {
+  const db = getDatabase();
+
+  assertCampaignReadyForDelivery(campaignId, ['scheduled']);
+
+  const scheduledAt = colomboLocalDateTimeToUtc(scheduledLocalDateTime);
+
+  if (new Date(scheduledAt).getTime() <= Date.now()) {
+    throw new Error('Scheduled time must be in the future.');
+  }
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE campaigns
+    SET
+      send_mode = 'scheduled',
+      timezone = ?,
+      scheduled_at = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).run(CAMPAIGN_TIMEZONE, scheduledAt, now, campaignId);
+
+  return {
+    campaignId,
+
+    status: 'scheduled',
+
+    sendMode: 'scheduled',
+
+    scheduledAt,
+
+    timezone: CAMPAIGN_TIMEZONE,
+  };
+}
+
+/* =========================================================
+   CANCEL SCHEDULE
+   ========================================================= */
+
+export function cancelCampaignSchedule(campaignId: string) {
+  const db = getDatabase();
+
+  const campaign = db
+    .prepare(`
+      SELECT
+        id,
+        status
+      FROM campaigns
+      WHERE id = ?
+      LIMIT 1
+    `)
+    .get(campaignId) as
+    | {
+        id: string;
+
+        status: string;
+      }
+    | undefined;
+
+  if (!campaign) {
+    throw new Error('Campaign was not found.');
+  }
+
+  if (campaign.status !== 'scheduled') {
+    throw new Error('Only scheduled campaigns can cancel their schedule.');
+  }
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE campaigns
+    SET
+      status = 'draft',
+      send_mode = 'now',
+      scheduled_at = NULL,
+      updated_at = ?
+    WHERE id = ?
+  `).run(now, campaignId);
+
+  return {
+    campaignId,
+
+    status: 'draft',
+  };
+}
+
+/* =========================================================
+   QUEUED -> DRAFT
+   ========================================================= */
+
+export function returnQueuedCampaignToDraft(campaignId: string) {
+  const db = getDatabase();
+
+  const campaign = db
+    .prepare(`
+      SELECT
+        id,
+        status,
+        processed_count,
+        started_at
+      FROM campaigns
+      WHERE id = ?
+      LIMIT 1
+    `)
+    .get(campaignId) as
+    | {
+        id: string;
+
+        status: string;
+
+        processed_count: number;
+
+        started_at: string | null;
+      }
+    | undefined;
+
+  if (!campaign) {
+    throw new Error('Campaign was not found.');
+  }
+
+  if (campaign.status !== 'queued') {
+    throw new Error('Only queued campaigns can be returned to draft.');
+  }
+
+  if (Number(campaign.processed_count) > 0 || campaign.started_at) {
+    throw new Error(
+      'This campaign has already started processing and cannot return to draft.',
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE campaigns
+    SET
+      status = 'draft',
+      send_mode = 'now',
+      scheduled_at = NULL,
+      updated_at = ?
+    WHERE id = ?
+  `).run(now, campaignId);
+
+  return {
+    campaignId,
+
+    status: 'draft',
+  };
+}
+
+/* =========================================================
+   PROCESS DUE CAMPAIGNS
+   ========================================================= */
+
+export function processDueCampaigns() {
+  const db = getDatabase();
+
+  const now = new Date().toISOString();
+
+  const result = db
+    .prepare(`
+      UPDATE campaigns
+      SET
+        status = 'queued',
+        updated_at = ?
+      WHERE status = 'scheduled'
+        AND scheduled_at IS NOT NULL
+        AND scheduled_at <= ?
+    `)
+    .run(now, now);
+
+  return Number(result.changes);
+}
+
+/* =========================================================
+   SCHEDULED / QUEUED LIST
+   ========================================================= */
+
+export function listScheduledCampaigns(): ScheduledCampaignListItem[] {
+  const db = getDatabase();
+
+  const rows = db
+    .prepare(`
+      SELECT
+        c.id,
+        c.name,
+        c.description,
+        c.status,
+        c.send_mode,
+        c.timezone,
+        c.scheduled_at,
+        c.created_at,
+        c.updated_at,
+        c.total_recipients,
+
+        (
+          SELECT COUNT(*)
+          FROM campaign_messages cm
+          WHERE cm.campaign_id = c.id
+        ) AS message_count,
+
+        (
+          SELECT COUNT(*)
+          FROM campaign_messages cm
+          WHERE cm.campaign_id = c.id
+            AND cm.media_asset_id IS NOT NULL
+        ) AS media_count
+
+      FROM campaigns c
+
+      WHERE c.status IN (
+        'scheduled',
+        'queued'
+      )
+
+      ORDER BY
+        CASE
+          WHEN c.status = 'scheduled'
+          THEN 0
+          ELSE 1
+        END,
+
+        CASE
+          WHEN c.scheduled_at IS NULL
+          THEN 1
+          ELSE 0
+        END,
+
+        c.scheduled_at ASC,
+
+        c.updated_at DESC
+    `)
+    .all() as Array<{
+    id: string;
+
+    name: string;
+
+    description: string | null;
+
+    status: string;
+
+    send_mode: string;
+
+    timezone: string;
+
+    scheduled_at: string | null;
+
+    created_at: string;
+
+    updated_at: string;
+
+    total_recipients: number;
+
+    message_count: number;
+
+    media_count: number;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+
+    name: row.name,
+
+    description: row.description,
+
+    status: row.status,
+
+    sendMode: row.send_mode,
+
+    timezone: row.timezone,
+
+    scheduledAt: row.scheduled_at,
+
+    createdAt: row.created_at,
+
+    updatedAt: row.updated_at,
+
+    recipientCount: Number(row.total_recipients),
+
+    messageCount: Number(row.message_count),
+
+    mediaCount: Number(row.media_count),
+  }));
 }

@@ -1,31 +1,32 @@
 import {
   ArrowDown,
   ArrowUp,
+  Calendar,
   Check,
   Edit3,
   Eye,
-  FileText,
-  Image as ImageIcon,
   Loader2,
   Megaphone,
   Paperclip,
   Plus,
   RefreshCw,
   Save,
+  Send,
   Trash2,
-  Type,
   X,
 } from 'lucide-react';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+
+import {
+  CampaignDetailsViewer,
+  type CampaignDetails,
+  type CampaignMedia,
+} from '../components/CampaignDetailsViewer';
 
 import { EmptyState } from '../components/EmptyState';
 
 import { PageHeader } from '../components/PageHeader';
-
-/* =========================================================
-   TYPES
-   ========================================================= */
 
 type MessageType =
   | 'text'
@@ -54,74 +55,6 @@ type SavedCampaign = {
   messageCount: number;
 
   mediaCount: number;
-};
-
-type CampaignMedia = {
-  id: string;
-
-  originalFilename: string;
-
-  mimeType: string | null;
-
-  fileSize: number | null;
-};
-
-type CampaignMessageDetails = {
-  id: string;
-
-  position: number;
-
-  type: string;
-
-  textContent: string | null;
-
-  caption: string | null;
-
-  media: CampaignMedia | null;
-};
-
-type CampaignRecipientDetails = {
-  id: string;
-
-  name: string | null;
-
-  normalizedPhone: string;
-
-  originalPhone: string | null;
-
-  status: string;
-};
-
-type SavedCampaignDetails = {
-  id: string;
-
-  name: string;
-
-  description: string | null;
-
-  status: string;
-
-  importId: string | null;
-
-  importFilename: string | null;
-
-  createdAt: string;
-
-  updatedAt: string;
-
-  totalRecipients: number;
-
-  eligibleRecipients: number;
-
-  processedCount: number;
-
-  successCount: number;
-
-  failureCount: number;
-
-  messages: CampaignMessageDetails[];
-
-  recipients: CampaignRecipientDetails[];
 };
 
 type NewAttachment = {
@@ -158,11 +91,7 @@ type EditCampaignState = {
   messages: EditMessage[];
 };
 
-type DetailsTab = 'preview' | 'messages' | 'recipients';
-
-/* =========================================================
-   MESSAGE OPTIONS
-   ========================================================= */
+type DeliveryMode = 'now' | 'scheduled';
 
 const messageOptions: Array<{
   type: MessageType;
@@ -195,10 +124,6 @@ const messageOptions: Array<{
   },
 ];
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
-
 function getStatusLabel(status: string) {
   switch (status.toLowerCase()) {
     case 'draft':
@@ -206,6 +131,9 @@ function getStatusLabel(status: string) {
 
     case 'scheduled':
       return 'Scheduled';
+
+    case 'queued':
+      return 'Queued';
 
     case 'running':
       return 'Running';
@@ -219,15 +147,6 @@ function getStatusLabel(status: string) {
     case 'failed':
       return 'Failed';
 
-    case 'cancelled':
-      return 'Cancelled';
-
-    case 'pending':
-      return 'Pending';
-
-    case 'sent':
-      return 'Sent';
-
     default:
       return status;
   }
@@ -238,21 +157,18 @@ function getStatusClass(status: string) {
     case 'scheduled':
       return 'border-blue-200 bg-blue-50 text-blue-700';
 
+    case 'queued':
+      return 'border-violet-200 bg-violet-50 text-violet-700';
+
     case 'running':
 
     case 'completed':
-
-    case 'sent':
       return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 
     case 'paused':
-
-    case 'pending':
       return 'border-amber-200 bg-amber-50 text-amber-700';
 
     case 'failed':
-
-    case 'cancelled':
       return 'border-red-200 bg-red-50 text-red-700';
 
     default:
@@ -280,18 +196,6 @@ function getMessageLabel(type: string) {
     default:
       return type;
   }
-}
-
-function getMessageIcon(type: string) {
-  if (type === 'text') {
-    return Type;
-  }
-
-  if (type === 'image' || type === 'image-caption') {
-    return ImageIcon;
-  }
-
-  return FileText;
 }
 
 function getAttachmentType(type: MessageType): 'image' | 'document' | null {
@@ -345,9 +249,7 @@ function isEditMessageComplete(message: EditMessage) {
     return Boolean(message.text.trim());
   }
 
-  const hasMedia = Boolean(message.existingMedia || message.newAttachment);
-
-  if (!hasMedia) {
+  if (!message.existingMedia && !message.newAttachment) {
     return false;
   }
 
@@ -358,9 +260,41 @@ function isEditMessageComplete(message: EditMessage) {
   return true;
 }
 
-/* =========================================================
-   COMPONENT
-   ========================================================= */
+function getDefaultScheduleValue() {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Colombo',
+
+    year: 'numeric',
+
+    month: '2-digit',
+
+    day: '2-digit',
+
+    hour: '2-digit',
+
+    minute: '2-digit',
+
+    hourCycle: 'h23',
+  });
+
+  const parts = formatter.formatToParts(new Date(Date.now() + 10 * 60_000));
+
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
+}
+
+function isFutureColomboDateTime(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  const timestamp = Date.parse(`${value}:00+05:30`);
+
+  return Number.isFinite(timestamp) && timestamp > Date.now();
+}
 
 export function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<SavedCampaign[]>([]);
@@ -374,11 +308,9 @@ export function CampaignsPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [selectedCampaign, setSelectedCampaign] =
-    useState<SavedCampaignDetails | null>(null);
+    useState<CampaignDetails | null>(null);
 
   const [loadingDetails, setLoadingDetails] = useState(false);
-
-  const [detailsTab, setDetailsTab] = useState<DetailsTab>('preview');
 
   const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>(
     {},
@@ -402,9 +334,19 @@ export function CampaignsPage() {
 
   const [deleting, setDeleting] = useState(false);
 
-  /* =========================================================
-     LOAD CAMPAIGNS
-     ========================================================= */
+  const [deliveryTarget, setDeliveryTarget] = useState<{
+    id: string;
+
+    name: string;
+  } | null>(null);
+
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('now');
+
+  const [scheduledLocalDateTime, setScheduledLocalDateTime] = useState(
+    getDefaultScheduleValue(),
+  );
+
+  const [savingDelivery, setSavingDelivery] = useState(false);
 
   async function loadCampaigns(manualRefresh = false) {
     try {
@@ -434,17 +376,11 @@ export function CampaignsPage() {
     void loadCampaigns();
   }, []);
 
-  /* =========================================================
-     LOAD DETAILS
-     ========================================================= */
-
-  async function loadDetails(campaignId: string) {
-    const details = await window.appAPI.getSavedCampaignDetails(campaignId);
-
-    return details;
+  async function getDetails(campaignId: string) {
+    return window.appAPI.getSavedCampaignDetails(campaignId);
   }
 
-  async function loadImagePreviews(details: SavedCampaignDetails) {
+  async function loadImagePreviews(details: CampaignDetails) {
     const imageMedia = details.messages
       .map((message) => message.media)
       .filter((media): media is CampaignMedia =>
@@ -474,15 +410,11 @@ export function CampaignsPage() {
 
       setError(null);
 
-      setSuccess(null);
-
       setMediaPreviews({});
 
-      const details = await loadDetails(campaignId);
+      const details = await getDetails(campaignId);
 
       setSelectedCampaign(details);
-
-      setDetailsTab('preview');
 
       await loadImagePreviews(details);
     } catch (err) {
@@ -494,17 +426,13 @@ export function CampaignsPage() {
     }
   }
 
-  /* =========================================================
-     OPEN EDIT
-     ========================================================= */
-
   async function openEdit(campaignId: string) {
     try {
       setLoadingDetails(true);
 
       setError(null);
 
-      const details = await loadDetails(campaignId);
+      const details = await getDetails(campaignId);
 
       if (details.status !== 'draft') {
         throw new Error('Only draft campaigns can be edited.');
@@ -540,17 +468,17 @@ export function CampaignsPage() {
     }
   }
 
-  /* =========================================================
-     EDIT MESSAGE FUNCTIONS
-     ========================================================= */
-
   function addEditMessage(type: MessageType) {
     setEditCampaign((current) =>
       current
         ? {
             ...current,
 
-            messages: [...current.messages, createEditMessage(type)],
+            messages: [
+              ...current.messages,
+
+              createEditMessage(type),
+            ],
           }
         : current,
     );
@@ -604,6 +532,7 @@ export function CampaignsPage() {
               message.clientId === clientId
                 ? {
                     ...message,
+
                     ...changes,
                   }
                 : message,
@@ -648,10 +577,6 @@ export function CampaignsPage() {
       setSelectingAttachment(null);
     }
   }
-
-  /* =========================================================
-     SAVE EDIT
-     ========================================================= */
 
   const editReady = Boolean(
     editCampaign &&
@@ -716,10 +641,6 @@ export function CampaignsPage() {
     }
   }
 
-  /* =========================================================
-     DELETE
-     ========================================================= */
-
   async function confirmDelete() {
     if (!deleteTarget) {
       return;
@@ -730,7 +651,7 @@ export function CampaignsPage() {
 
       setError(null);
 
-      const result = await window.appAPI.deleteCampaign(deleteTarget.id);
+      await window.appAPI.deleteCampaign(deleteTarget.id);
 
       if (selectedCampaign?.id === deleteTarget.id) {
         setSelectedCampaign(null);
@@ -740,9 +661,7 @@ export function CampaignsPage() {
 
       setDeleteTarget(null);
 
-      setSuccess(
-        `Campaign deleted. ${result.deletedMessages} messages and ${result.deletedRecipients} recipients were removed.`,
-      );
+      setSuccess('Campaign draft deleted.');
 
       await loadCampaigns();
     } catch (err) {
@@ -754,9 +673,76 @@ export function CampaignsPage() {
     }
   }
 
-  /* =========================================================
-     TOTALS
-     ========================================================= */
+  function openDelivery(campaign: SavedCampaign) {
+    setDeliveryTarget({
+      id: campaign.id,
+
+      name: campaign.name,
+    });
+
+    setDeliveryMode('now');
+
+    setScheduledLocalDateTime(getDefaultScheduleValue());
+
+    setError(null);
+  }
+
+  const scheduleTimeValid = useMemo(
+    () => isFutureColomboDateTime(scheduledLocalDateTime),
+    [scheduledLocalDateTime],
+  );
+
+  async function confirmDelivery() {
+    if (!deliveryTarget) {
+      return;
+    }
+
+    if (deliveryMode === 'scheduled' && !scheduleTimeValid) {
+      setError('Choose a future date and time in Asia/Colombo.');
+
+      return;
+    }
+
+    try {
+      setSavingDelivery(true);
+
+      setError(null);
+
+      if (deliveryMode === 'now') {
+        await window.appAPI.queueCampaignNow(deliveryTarget.id);
+
+        setSuccess(
+          'Campaign is queued for the WhatsApp sender. No messages have been sent yet.',
+        );
+      } else {
+        await window.appAPI.scheduleCampaign({
+          campaignId: deliveryTarget.id,
+
+          scheduledLocalDateTime,
+        });
+
+        setSuccess('Campaign scheduled successfully.');
+      }
+
+      const campaignId = deliveryTarget.id;
+
+      setDeliveryTarget(null);
+
+      await loadCampaigns();
+
+      if (selectedCampaign?.id === campaignId) {
+        await viewCampaign(campaignId);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to configure campaign delivery.',
+      );
+    } finally {
+      setSavingDelivery(false);
+    }
+  }
 
   const draftCount = campaigns.filter(
     (campaign) => campaign.status === 'draft',
@@ -772,15 +758,11 @@ export function CampaignsPage() {
     0,
   );
 
-  /* =========================================================
-     UI
-     ========================================================= */
-
   return (
     <>
       <PageHeader
         title="Campaigns"
-        description="View, preview and manage your campaign drafts."
+        description="Create, preview, edit and prepare campaign drafts for delivery."
       />
 
       {error && (
@@ -810,10 +792,8 @@ export function CampaignsPage() {
         />
       ) : (
         <>
-          {/* OVERVIEW */}
-
           <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
                 Campaigns
               </p>
@@ -821,7 +801,7 @@ export function CampaignsPage() {
               <p className="mt-2 text-2xl font-bold">{campaigns.length}</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
                 Drafts
               </p>
@@ -829,7 +809,7 @@ export function CampaignsPage() {
               <p className="mt-2 text-2xl font-bold">{draftCount}</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
                 Recipients
               </p>
@@ -837,7 +817,7 @@ export function CampaignsPage() {
               <p className="mt-2 text-2xl font-bold">{totalRecipients}</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
                 Messages
               </p>
@@ -846,15 +826,13 @@ export function CampaignsPage() {
             </div>
           </div>
 
-          {/* TABLE */}
-
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-6">
               <div>
                 <h3 className="font-semibold">Saved Campaigns</h3>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Draft campaigns can be edited, reordered or deleted.
+                  Drafts can be edited, deleted or prepared for delivery.
                 </p>
               </div>
 
@@ -862,7 +840,7 @@ export function CampaignsPage() {
                 type="button"
                 onClick={() => void loadCampaigns(true)}
                 disabled={refreshing}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold"
+                className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold"
               >
                 <RefreshCw
                   className={refreshing ? 'animate-spin' : ''}
@@ -885,8 +863,6 @@ export function CampaignsPage() {
                     <th className="px-5 py-3">Messages</th>
 
                     <th className="px-5 py-3">Media</th>
-
-                    <th className="px-5 py-3">Created</th>
 
                     <th className="px-5 py-3">Actions</th>
                   </tr>
@@ -919,12 +895,8 @@ export function CampaignsPage() {
 
                       <td className="px-5 py-4">{campaign.mediaCount}</td>
 
-                      <td className="whitespace-nowrap px-5 py-4 text-slate-500">
-                        {new Date(campaign.createdAt).toLocaleString()}
-                      </td>
-
                       <td className="px-5 py-4">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => void viewCampaign(campaign.id)}
@@ -943,6 +915,15 @@ export function CampaignsPage() {
                                 title="Edit"
                               >
                                 <Edit3 size={16} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => openDelivery(campaign)}
+                                className="rounded-lg border border-emerald-200 p-2 text-emerald-700"
+                                title="Delivery"
+                              >
+                                <Send size={16} />
                               </button>
 
                               <button
@@ -977,288 +958,19 @@ export function CampaignsPage() {
             </div>
           )}
 
-          {/* =================================================
-              DETAILS
-              ================================================= */}
-
           {selectedCampaign && !loadingDetails && !editCampaign && (
-            <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b p-6">
-                <div>
-                  <h3 className="text-xl font-semibold">
-                    {selectedCampaign.name}
-                  </h3>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    {selectedCampaign.description || 'No description'}
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  {selectedCampaign.status === 'draft' && (
-                    <button
-                      type="button"
-                      onClick={() => void openEdit(selectedCampaign.id)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700"
-                    >
-                      <Edit3 size={16} />
-                      Edit
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCampaign(null)}
-                    className="rounded-lg border p-2"
-                  >
-                    <X size={17} />
-                  </button>
-                </div>
-              </div>
-
-              {/* TABS */}
-
-              <div className="flex gap-2 border-b p-4">
-                {(
-                  [
-                    ['preview', 'Chat Preview'],
-
-                    ['messages', 'Messages'],
-
-                    ['recipients', 'Recipients'],
-                  ] as Array<[DetailsTab, string]>
-                ).map(([tab, label]) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setDetailsTab(tab)}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-                      detailsTab === tab
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* =================================================
-                    WHATSAPP PREVIEW
-                    ================================================= */}
-
-              {detailsTab === 'preview' && (
-                <div className="p-6">
-                  <div className="mx-auto max-w-xl overflow-hidden rounded-[28px] border border-slate-300 bg-white shadow-lg">
-                    <div className="bg-emerald-700 px-5 py-4 text-white">
-                      <p className="font-semibold">{selectedCampaign.name}</p>
-
-                      <p className="text-xs text-emerald-100">
-                        Campaign Preview
-                      </p>
-                    </div>
-
-                    <div className="min-h-[500px] space-y-3 bg-[#efeae2] p-4">
-                      {selectedCampaign.messages.map((message) => {
-                        const preview = message.media
-                          ? mediaPreviews[message.media.id]
-                          : null;
-
-                        const time = new Date(
-                          selectedCampaign.createdAt,
-                        ).toLocaleTimeString([], {
-                          hour: '2-digit',
-
-                          minute: '2-digit',
-                        });
-
-                        return (
-                          <div key={message.id} className="flex justify-end">
-                            <div className="max-w-[82%] rounded-xl bg-[#d9fdd3] p-2 shadow-sm">
-                              {message.media?.mimeType?.startsWith(
-                                'image/',
-                              ) && (
-                                <>
-                                  {preview ? (
-                                    <img
-                                      src={preview}
-                                      alt={message.media.originalFilename}
-                                      className="mb-2 max-h-80 w-full rounded-lg object-cover"
-                                    />
-                                  ) : (
-                                    <div className="mb-2 flex h-40 items-center justify-center rounded-lg bg-slate-200">
-                                      <ImageIcon
-                                        className="text-slate-500"
-                                        size={30}
-                                      />
-                                    </div>
-                                  )}
-                                </>
-                              )}
-
-                              {message.media &&
-                                !message.media.mimeType?.startsWith(
-                                  'image/',
-                                ) && (
-                                  <div className="mb-2 flex items-center gap-3 rounded-lg bg-white/70 p-3">
-                                    <FileText
-                                      className="shrink-0 text-slate-600"
-                                      size={24}
-                                    />
-
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-semibold">
-                                        {message.media.originalFilename}
-                                      </p>
-
-                                      <p className="text-xs text-slate-500">
-                                        {formatFileSize(message.media.fileSize)}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-
-                              {message.textContent && (
-                                <p className="whitespace-pre-wrap px-1 text-sm leading-6 text-slate-900">
-                                  {message.textContent}
-                                </p>
-                              )}
-
-                              {message.caption && (
-                                <p className="whitespace-pre-wrap px-1 text-sm leading-6 text-slate-900">
-                                  {message.caption}
-                                </p>
-                              )}
-
-                              <div className="mt-1 flex justify-end">
-                                <span className="text-[10px] text-slate-500">
-                                  {time}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* =================================================
-                    MESSAGE DETAILS
-                    ================================================= */}
-
-              {detailsTab === 'messages' && (
-                <div className="space-y-4 p-6">
-                  {selectedCampaign.messages.map((message) => {
-                    const Icon = getMessageIcon(message.type);
-
-                    return (
-                      <div key={message.id} className="rounded-xl border p-5">
-                        <div className="flex items-center gap-3">
-                          <Icon size={18} className="text-emerald-700" />
-
-                          <div>
-                            <p className="font-semibold">
-                              Message {message.position}
-                            </p>
-
-                            <p className="text-xs text-slate-500">
-                              {getMessageLabel(message.type)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {message.textContent && (
-                          <p className="mt-4 whitespace-pre-wrap text-sm leading-6">
-                            {message.textContent}
-                          </p>
-                        )}
-
-                        {message.media && (
-                          <div className="mt-4 flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-                            <Paperclip size={17} />
-
-                            <div>
-                              <p className="text-sm font-semibold">
-                                {message.media.originalFilename}
-                              </p>
-
-                              <p className="text-xs text-slate-500">
-                                {formatFileSize(message.media.fileSize)}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {message.caption && (
-                          <p className="mt-4 whitespace-pre-wrap text-sm leading-6">
-                            {message.caption}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* =================================================
-                    RECIPIENTS
-                    ================================================= */}
-
-              {detailsTab === 'recipients' && (
-                <div className="p-6">
-                  <div className="max-h-[500px] overflow-auto rounded-xl border">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="sticky top-0 bg-slate-50">
-                        <tr>
-                          <th className="px-5 py-3">Name</th>
-
-                          <th className="px-5 py-3">WhatsApp</th>
-
-                          <th className="px-5 py-3">Original</th>
-
-                          <th className="px-5 py-3">Status</th>
-                        </tr>
-                      </thead>
-
-                      <tbody className="divide-y">
-                        {selectedCampaign.recipients.map((recipient) => (
-                          <tr key={recipient.id}>
-                            <td className="px-5 py-3">
-                              {recipient.name || '—'}
-                            </td>
-
-                            <td className="px-5 py-3">
-                              {recipient.normalizedPhone}
-                            </td>
-
-                            <td className="px-5 py-3">
-                              {recipient.originalPhone || '—'}
-                            </td>
-
-                            <td className="px-5 py-3">
-                              <span
-                                className={`rounded-full border px-2 py-1 text-xs ${getStatusClass(
-                                  recipient.status,
-                                )}`}
-                              >
-                                {getStatusLabel(recipient.status)}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </section>
+            <CampaignDetailsViewer
+              key={`${selectedCampaign.id}-${selectedCampaign.updatedAt}`}
+              campaign={selectedCampaign}
+              mediaPreviews={mediaPreviews}
+              onClose={() => setSelectedCampaign(null)}
+              onEdit={
+                selectedCampaign.status === 'draft'
+                  ? () => void openEdit(selectedCampaign.id)
+                  : undefined
+              }
+            />
           )}
-
-          {/* =================================================
-              EDITOR
-              ================================================= */}
 
           {editCampaign && (
             <section className="mt-6 rounded-2xl border border-blue-200 bg-white shadow-sm">
@@ -1318,8 +1030,6 @@ export function CampaignsPage() {
                   </div>
                 </div>
 
-                {/* ADD MESSAGE */}
-
                 <div>
                   <p className="text-sm font-semibold">Add Message</p>
 
@@ -1338,8 +1048,6 @@ export function CampaignsPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* EDIT MESSAGES */}
 
                 <div className="space-y-4">
                   {editCampaign.messages.map((message, index) => {
@@ -1545,9 +1253,114 @@ export function CampaignsPage() {
         </>
       )}
 
-      {/* =====================================================
-          DELETE MODAL
-          ===================================================== */}
+      {deliveryTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="border-b p-6">
+              <h3 className="text-lg font-semibold">Delivery Setup</h3>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Prepare <strong>{deliveryTarget.name}</strong> for the WhatsApp
+                sender.
+              </p>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <label className="flex cursor-pointer gap-3 rounded-xl border p-4">
+                <input
+                  type="radio"
+                  checked={deliveryMode === 'now'}
+                  onChange={() => setDeliveryMode('now')}
+                />
+
+                <div>
+                  <p className="font-semibold">Send Now</p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Move this campaign to Queued. No WhatsApp messages are sent
+                    yet.
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex cursor-pointer gap-3 rounded-xl border p-4">
+                <input
+                  type="radio"
+                  checked={deliveryMode === 'scheduled'}
+                  onChange={() => setDeliveryMode('scheduled')}
+                />
+
+                <div className="w-full">
+                  <p className="font-semibold">Schedule Later</p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Automatically move to Queued when this time arrives.
+                  </p>
+
+                  {deliveryMode === 'scheduled' && (
+                    <div className="mt-4">
+                      <label className="text-xs font-semibold uppercase text-slate-500">
+                        Date & Time
+                      </label>
+
+                      <div className="mt-2 flex items-center gap-2">
+                        <Calendar size={17} className="text-slate-500" />
+
+                        <input
+                          type="datetime-local"
+                          value={scheduledLocalDateTime}
+                          onChange={(event) =>
+                            setScheduledLocalDateTime(event.target.value)
+                          }
+                          className="w-full rounded-xl border px-3 py-2.5"
+                        />
+                      </div>
+
+                      <p className="mt-2 text-xs text-slate-500">
+                        Timezone: Asia/Colombo (UTC+05:30)
+                      </p>
+
+                      {!scheduleTimeValid && (
+                        <p className="mt-2 text-xs text-red-600">
+                          Choose a future date and time.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t p-6">
+              <button
+                type="button"
+                disabled={savingDelivery}
+                onClick={() => setDeliveryTarget(null)}
+                className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  savingDelivery ||
+                  (deliveryMode === 'scheduled' && !scheduleTimeValid)
+                }
+                onClick={() => void confirmDelivery()}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {savingDelivery ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <Send size={16} />
+                )}
+                Confirm Delivery
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
@@ -1556,8 +1369,8 @@ export function CampaignsPage() {
               <h3 className="text-lg font-semibold">Delete Campaign?</h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                This permanently removes the draft, message sequence, recipient
-                snapshot and stored media.
+                This permanently removes the draft, messages, recipients and
+                stored media.
               </p>
             </div>
 
