@@ -31,6 +31,7 @@ import {
 } from './services/imports/file-parser';
 
 import {
+  getSavedImportDetails,
   listSavedImports,
   saveValidatedImport,
 } from './services/imports/import-repository';
@@ -245,6 +246,27 @@ app.whenReady().then(() => {
   'imports:list',
   () => {
     return listSavedImports();
+  },
+);
+
+ipcMain.handle(
+  'imports:get-details',
+  (
+    _event,
+    importId: string,
+  ) => {
+    const result =
+      getSavedImportDetails(
+        importId,
+      );
+
+    if (!result) {
+      throw new Error(
+        'Saved import was not found.',
+      );
+    }
+
+    return result;
   },
 );
 

@@ -71,19 +71,55 @@ declare global {
           duplicateRows: number;
         }>;
 
-        listSavedImports: () =>
-  Promise<
-    Array<{
-      id: string;
-      filename: string;
-      fileType: string;
-      importedAt: string;
-      totalRows: number;
-      validRows: number;
-      invalidRows: number;
-      duplicateRows: number;
-    }>
-  >;
+      listSavedImports: () =>
+        Promise<
+          Array<{
+            id: string;
+            filename: string;
+            fileType: string;
+            importedAt: string;
+            totalRows: number;
+            validRows: number;
+            invalidRows: number;
+            duplicateRows: number;
+          }>
+        >;
+
+      getSavedImportDetails: (
+        importId: string,
+      ) =>
+        Promise<{
+          id: string;
+          filename: string;
+          fileType: string;
+          importedAt: string;
+          totalRows: number;
+          validRows: number;
+          invalidRows: number;
+          duplicateRows: number;
+
+          contacts: Array<{
+            id: string;
+            name: string;
+            originalPhone: string;
+
+            normalizedPhone:
+              | string
+              | null;
+
+            validationStatus: string;
+
+            validationReason:
+              | string
+              | null;
+
+            isDuplicate: boolean;
+
+            rowNumber:
+              | number
+              | null;
+          }>;
+        }>;
     };
   }
 }

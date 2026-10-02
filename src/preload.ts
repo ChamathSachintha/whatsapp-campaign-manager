@@ -50,5 +50,13 @@ contextBridge.exposeInMainWorld(
   ipcRenderer.invoke(
     'imports:list',
   ),
+
+  getSavedImportDetails: (
+  importId: string,
+) =>
+  ipcRenderer.invoke(
+    'imports:get-details',
+    importId,
+  ),
   },
 );

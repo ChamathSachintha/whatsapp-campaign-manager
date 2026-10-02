@@ -16,6 +16,29 @@ export type SavedImportListItem = {
   duplicateRows: number;
 };
 
+export type SavedImportContact = {
+  id: string;
+  name: string;
+  originalPhone: string;
+  normalizedPhone: string | null;
+  validationStatus: string;
+  validationReason: string | null;
+  isDuplicate: boolean;
+  rowNumber: number | null;
+};
+
+export type SavedImportDetails = {
+  id: string;
+  filename: string;
+  fileType: string;
+  importedAt: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  contacts: SavedImportContact[];
+};
+
 import {
   getDatabase,
 } from '../../db/database';
@@ -290,4 +313,137 @@ export function listSavedImports():
         row.duplicate_rows,
     }),
   );
+}
+export function getSavedImportDetails(
+  importId: string,
+): SavedImportDetails | null {
+  const db =
+    getDatabase();
+
+  const importStatement =
+    db.prepare(`
+      SELECT
+        id,
+        filename,
+        file_type,
+        imported_at,
+        total_rows,
+        valid_rows,
+        invalid_rows,
+        duplicate_rows
+      FROM imports
+      WHERE id = ?
+      LIMIT 1
+    `);
+
+  const importRow =
+    importStatement.get(
+      importId,
+    ) as
+      | {
+          id: string;
+          filename: string;
+          file_type: string;
+          imported_at: string;
+          total_rows: number;
+          valid_rows: number;
+          invalid_rows: number;
+          duplicate_rows: number;
+        }
+      | undefined;
+
+  if (!importRow) {
+    return null;
+  }
+
+  const contactStatement =
+    db.prepare(`
+      SELECT
+        id,
+        name,
+        original_phone,
+        normalized_phone,
+        validation_status,
+        validation_reason,
+        is_duplicate,
+        row_number
+      FROM import_contacts
+      WHERE import_id = ?
+      ORDER BY row_number ASC
+    `);
+
+  const contactRows =
+    contactStatement.all(
+      importId,
+    ) as Array<{
+      id: string;
+      name: string | null;
+      original_phone: string;
+      normalized_phone:
+        | string
+        | null;
+      validation_status: string;
+      validation_reason:
+        | string
+        | null;
+      is_duplicate: number;
+      row_number:
+        | number
+        | null;
+    }>;
+
+  return {
+    id:
+      importRow.id,
+
+    filename:
+      importRow.filename,
+
+    fileType:
+      importRow.file_type,
+
+    importedAt:
+      importRow.imported_at,
+
+    totalRows:
+      importRow.total_rows,
+
+    validRows:
+      importRow.valid_rows,
+
+    invalidRows:
+      importRow.invalid_rows,
+
+    duplicateRows:
+      importRow.duplicate_rows,
+
+    contacts:
+      contactRows.map(
+        (row) => ({
+          id:
+            row.id,
+
+          name:
+            row.name ?? '',
+
+          originalPhone:
+            row.original_phone,
+
+          normalizedPhone:
+            row.normalized_phone,
+
+          validationStatus:
+            row.validation_status,
+
+          validationReason:
+            row.validation_reason,
+
+          isDuplicate:
+            row.is_duplicate === 1,
+
+          rowNumber:
+            row.row_number,
+        }),
+      ),
+  };
 }
