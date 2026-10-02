@@ -8,14 +8,12 @@ import {
   Image as ImageIcon,
   Loader2,
   Megaphone,
-  MessageSquare,
   Paperclip,
   Plus,
   RefreshCw,
   Save,
   Trash2,
   Type,
-  Users,
   X,
 } from 'lucide-react';
 
