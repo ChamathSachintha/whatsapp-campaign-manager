@@ -8,6 +8,17 @@ import { closeDatabase, initializeDatabase } from './db/database';
 
 import { getDatabaseHealth } from './db/health';
 
+import { chooseCampaignAttachment } from './services/campaigns/media-picker';
+
+import {
+  deleteCampaignDraft,
+  getCampaignMediaPreview,
+  getSavedCampaignDetails,
+  listSavedCampaigns,
+  saveCampaignDraft,
+  updateCampaignDraft,
+} from './services/campaigns/campaign-repository';
+
 import { detectContactColumns } from './services/imports/column-detector';
 
 import { validateContacts } from './services/imports/contact-validator';
@@ -25,7 +36,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 /* =========================================================
-   SQUIRREL STARTUP
+   SQUIRREL
    ========================================================= */
 
 if (started) {
@@ -33,15 +44,17 @@ if (started) {
 }
 
 /* =========================================================
-   CREATE MAIN WINDOW
+   WINDOW
    ========================================================= */
 
 const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     width: 1360,
+
     height: 860,
 
     minWidth: 1100,
+
     minHeight: 700,
 
     show: false,
@@ -81,29 +94,17 @@ const createWindow = (): void => {
    ========================================================= */
 
 app.whenReady().then(() => {
-  /* -------------------------------------------------------
-     DATABASE
-     ------------------------------------------------------- */
-
   initializeDatabase();
 
   /* -------------------------------------------------------
-     DATABASE HEALTH
-     ------------------------------------------------------- */
+       DATABASE
+       ------------------------------------------------------- */
 
-  ipcMain.handle('database:get-health', () => {
-    console.log('[IPC] database:get-health called');
-
-    const result = getDatabaseHealth();
-
-    console.log('[IPC] database health result:', result);
-
-    return result;
-  });
+  ipcMain.handle('database:get-health', () => getDatabaseHealth());
 
   /* -------------------------------------------------------
-     CHOOSE CONTACT FILE
-     ------------------------------------------------------- */
+       IMPORTS - CHOOSE FILE
+       ------------------------------------------------------- */
 
   ipcMain.handle('imports:choose-file', async () => {
     const result = await dialog.showOpenDialog({
@@ -164,16 +165,14 @@ app.whenReady().then(() => {
   });
 
   /* -------------------------------------------------------
-     LIST SAVED IMPORTS
-     ------------------------------------------------------- */
+       IMPORTS - LIST
+       ------------------------------------------------------- */
 
-  ipcMain.handle('imports:list', () => {
-    return listSavedImports();
-  });
+  ipcMain.handle('imports:list', () => listSavedImports());
 
   /* -------------------------------------------------------
-     GET SAVED IMPORT DETAILS
-     ------------------------------------------------------- */
+       IMPORTS - DETAILS
+       ------------------------------------------------------- */
 
   ipcMain.handle('imports:get-details', (_event, importId: string) => {
     const result = getSavedImportDetails(importId);
@@ -186,8 +185,8 @@ app.whenReady().then(() => {
   });
 
   /* -------------------------------------------------------
-     VALIDATE CONTACT FILE
-     ------------------------------------------------------- */
+       IMPORTS - VALIDATE
+       ------------------------------------------------------- */
 
   ipcMain.handle(
     'imports:validate-file',
@@ -223,8 +222,8 @@ app.whenReady().then(() => {
   );
 
   /* -------------------------------------------------------
-     SAVE CONTACT IMPORT
-     ------------------------------------------------------- */
+       IMPORTS - SAVE
+       ------------------------------------------------------- */
 
   ipcMain.handle(
     'imports:save',
@@ -274,22 +273,156 @@ app.whenReady().then(() => {
   );
 
   /* -------------------------------------------------------
-     DELETE SAVED IMPORT
-     ------------------------------------------------------- */
+       IMPORTS - DELETE
+       ------------------------------------------------------- */
 
-  ipcMain.handle('imports:delete', (_event, importId: string) => {
-    return deleteSavedImport(importId);
+  ipcMain.handle('imports:delete', (_event, importId: string) =>
+    deleteSavedImport(importId),
+  );
+
+  /* -------------------------------------------------------
+       CAMPAIGN ATTACHMENT PICKER
+       ------------------------------------------------------- */
+
+  ipcMain.handle(
+    'campaigns:choose-attachment',
+    (
+      _event,
+
+      type: 'image' | 'document',
+    ) => {
+      if (type !== 'image' && type !== 'document') {
+        throw new Error('Invalid campaign attachment type.');
+      }
+
+      return chooseCampaignAttachment(type);
+    },
+  );
+
+  /* -------------------------------------------------------
+       CAMPAIGNS - SAVE DRAFT
+       ------------------------------------------------------- */
+
+  ipcMain.handle(
+    'campaigns:save-draft',
+    (
+      _event,
+
+      options: {
+        name: string;
+
+        description?: string | null;
+
+        importId: string;
+
+        messages: Array<{
+          type:
+            | 'text'
+            | 'image'
+            | 'image-caption'
+            | 'document'
+            | 'document-caption';
+
+          text?: string | null;
+
+          caption?: string | null;
+
+          filePath?: string | null;
+
+          fileName?: string | null;
+
+          fileExtension?: string | null;
+
+          fileSizeBytes?: number | null;
+        }>;
+      },
+    ) => saveCampaignDraft(options),
+  );
+
+  /* -------------------------------------------------------
+       CAMPAIGNS - LIST
+       ------------------------------------------------------- */
+
+  ipcMain.handle('campaigns:list', () => listSavedCampaigns());
+
+  /* -------------------------------------------------------
+       CAMPAIGNS - DETAILS
+       ------------------------------------------------------- */
+
+  ipcMain.handle('campaigns:get-details', (_event, campaignId: string) => {
+    const result = getSavedCampaignDetails(campaignId);
+
+    if (!result) {
+      throw new Error('Campaign was not found.');
+    }
+
+    return result;
   });
 
   /* -------------------------------------------------------
-     APP VERSION
-     ------------------------------------------------------- */
+       CAMPAIGNS - IMAGE PREVIEW
+       ------------------------------------------------------- */
 
-  ipcMain.handle('app:get-version', () => app.getVersion());
+  ipcMain.handle(
+    'campaigns:get-media-preview',
+    (_event, mediaAssetId: string) => getCampaignMediaPreview(mediaAssetId),
+  );
 
   /* -------------------------------------------------------
-     CREATE WINDOW
-     ------------------------------------------------------- */
+       CAMPAIGNS - UPDATE DRAFT
+       ------------------------------------------------------- */
+
+  ipcMain.handle(
+    'campaigns:update-draft',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        name: string;
+
+        description?: string | null;
+
+        messages: Array<{
+          type:
+            | 'text'
+            | 'image'
+            | 'image-caption'
+            | 'document'
+            | 'document-caption';
+
+          text?: string | null;
+
+          caption?: string | null;
+
+          filePath?: string | null;
+
+          fileName?: string | null;
+
+          fileExtension?: string | null;
+
+          fileSizeBytes?: number | null;
+
+          existingMediaAssetId?: string | null;
+        }>;
+      },
+    ) => updateCampaignDraft(options),
+  );
+
+  /* -------------------------------------------------------
+       CAMPAIGNS - DELETE
+       ------------------------------------------------------- */
+
+  ipcMain.handle('campaigns:delete', (_event, campaignId: string) =>
+    deleteCampaignDraft(campaignId),
+  );
+
+  /* -------------------------------------------------------
+       VERSION
+       ------------------------------------------------------- */
+
+  ipcMain.handle('app:get-version', () => app.getVersion());
 
   createWindow();
 
@@ -301,7 +434,7 @@ app.whenReady().then(() => {
 });
 
 /* =========================================================
-   APP CLOSE EVENTS
+   CLOSE
    ========================================================= */
 
 app.on('window-all-closed', () => {

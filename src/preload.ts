@@ -9,14 +9,19 @@ contextBridge.exposeInMainWorld('appAPI', {
 
   validateContactFile: (options: {
     filePath: string;
+
     phoneColumn: string;
+
     nameColumn?: string | null;
   }) => ipcRenderer.invoke('imports:validate-file', options),
 
   saveContactImport: (options: {
     filePath: string;
+
     phoneColumn: string;
+
     nameColumn?: string | null;
+
     sourceNote?: string | null;
   }) => ipcRenderer.invoke('imports:save', options),
 
@@ -27,4 +32,78 @@ contextBridge.exposeInMainWorld('appAPI', {
 
   deleteSavedImport: (importId: string) =>
     ipcRenderer.invoke('imports:delete', importId),
+
+  chooseCampaignAttachment: (type: 'image' | 'document') =>
+    ipcRenderer.invoke('campaigns:choose-attachment', type),
+
+  saveCampaignDraft: (options: {
+    name: string;
+
+    description?: string | null;
+
+    importId: string;
+
+    messages: Array<{
+      type:
+        | 'text'
+        | 'image'
+        | 'image-caption'
+        | 'document'
+        | 'document-caption';
+
+      text?: string | null;
+
+      caption?: string | null;
+
+      filePath?: string | null;
+
+      fileName?: string | null;
+
+      fileExtension?: string | null;
+
+      fileSizeBytes?: number | null;
+    }>;
+  }) => ipcRenderer.invoke('campaigns:save-draft', options),
+
+  listSavedCampaigns: () => ipcRenderer.invoke('campaigns:list'),
+
+  getSavedCampaignDetails: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:get-details', campaignId),
+
+  getCampaignMediaPreview: (mediaAssetId: string) =>
+    ipcRenderer.invoke('campaigns:get-media-preview', mediaAssetId),
+
+  updateCampaignDraft: (options: {
+    campaignId: string;
+
+    name: string;
+
+    description?: string | null;
+
+    messages: Array<{
+      type:
+        | 'text'
+        | 'image'
+        | 'image-caption'
+        | 'document'
+        | 'document-caption';
+
+      text?: string | null;
+
+      caption?: string | null;
+
+      filePath?: string | null;
+
+      fileName?: string | null;
+
+      fileExtension?: string | null;
+
+      fileSizeBytes?: number | null;
+
+      existingMediaAssetId?: string | null;
+    }>;
+  }) => ipcRenderer.invoke('campaigns:update-draft', options),
+
+  deleteCampaign: (campaignId: string) =>
+    ipcRenderer.invoke('campaigns:delete', campaignId),
 });
