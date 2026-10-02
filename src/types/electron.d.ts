@@ -54,6 +54,22 @@ declare global {
         },
       ) =>
         Promise<ContactValidationResult>;
+
+      saveContactImport: (
+        options: {
+          filePath: string;
+          phoneColumn: string;
+          nameColumn?: string | null;
+          sourceNote?: string | null;
+        },
+      ) =>
+        Promise<{
+          importId: string;
+          totalRows: number;
+          validRows: number;
+          invalidRows: number;
+          duplicateRows: number;
+        }>;
     };
   }
 }

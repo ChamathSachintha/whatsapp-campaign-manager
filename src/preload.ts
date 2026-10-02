@@ -32,5 +32,18 @@ contextBridge.exposeInMainWorld(
         'imports:validate-file',
         options,
       ),
+
+    saveContactImport: (
+      options: {
+        filePath: string;
+        phoneColumn: string;
+        nameColumn?: string | null;
+        sourceNote?: string | null;
+      },
+    ) =>
+      ipcRenderer.invoke(
+        'imports:save',
+        options,
+      ),
   },
 );

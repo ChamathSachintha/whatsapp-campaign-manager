@@ -44,6 +44,19 @@ export function ImportContactsPage() {
     ContactFileInspection['validationResult']
   >(null);
 
+  const [saving, setSaving] =
+    useState(false);
+
+  const [
+    savedImportId,
+    setSavedImportId,
+  ] = useState<string | null>(null);
+
+  const [
+    saveMessage,
+    setSaveMessage,
+  ] = useState<string | null>(null);
+
   /* =========================================================
      CHOOSE FILE
      ========================================================= */
@@ -52,6 +65,9 @@ export function ImportContactsPage() {
     try {
       setLoading(true);
       setError(null);
+
+      setSavedImportId(null);
+      setSaveMessage(null);
 
       const result =
         await window.appAPI.chooseContactFile();
@@ -82,6 +98,9 @@ export function ImportContactsPage() {
       setSelectedNameColumn('');
       setValidation(null);
 
+      setSavedImportId(null);
+      setSaveMessage(null);
+
       setError(
         err instanceof Error
           ? err.message
@@ -100,6 +119,9 @@ export function ImportContactsPage() {
     phoneColumn: string,
     nameColumn: string,
   ) {
+    setSavedImportId(null);
+    setSaveMessage(null);
+
     if (
       !selectedFile?.filePath ||
       !phoneColumn
@@ -133,6 +155,58 @@ export function ImportContactsPage() {
           ? err.message
           : 'Unable to validate the selected columns.',
       );
+    }
+  }
+
+  /* =========================================================
+     SAVE IMPORT
+     ========================================================= */
+
+  async function saveImport() {
+    if (
+      !selectedFile?.filePath ||
+      !selectedPhoneColumn ||
+      !validation
+    ) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      setError(null);
+      setSaveMessage(null);
+
+      const result =
+        await window.appAPI.saveContactImport({
+          filePath:
+            selectedFile.filePath,
+
+          phoneColumn:
+            selectedPhoneColumn,
+
+          nameColumn:
+            selectedNameColumn ||
+            null,
+      });
+
+      setSavedImportId(
+        result.importId,
+      );
+
+      setSaveMessage(
+        `Import saved successfully. ${result.validRows} valid contacts are ready.`,
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to save the contact import.',
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -547,13 +621,15 @@ export function ImportContactsPage() {
                             {/* STATUS */}
 
                             <td className="px-5 py-3">
-
                               {contact.status ===
                                 'valid' && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                   <CheckCircle2
-                                    size={14}
+                                    size={
+                                      14
+                                    }
                                   />
+
                                   Valid
                                 </span>
                               )}
@@ -562,8 +638,11 @@ export function ImportContactsPage() {
                                 'invalid' && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
                                   <XCircle
-                                    size={14}
+                                    size={
+                                      14
+                                    }
                                   />
+
                                   Invalid
                                 </span>
                               )}
@@ -588,6 +667,81 @@ export function ImportContactsPage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              {/* CONFIRM IMPORT */}
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      Confirm Import
+                    </h3>
+
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                      Save this contact import
+                      locally. Valid,
+                      duplicate, and invalid
+                      rows will be kept in the
+                      import history for
+                      reference.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      saveImport
+                    }
+                    disabled={
+                      saving ||
+                      Boolean(
+                        savedImportId,
+                      ) ||
+                      validation.summary
+                        .validRows === 0
+                    }
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving
+                      ? 'Saving...'
+                      : savedImportId
+                        ? 'Import Saved'
+                        : 'Save Import'}
+                  </button>
+                </div>
+
+                {/* SAVE SUCCESS */}
+
+                {saveMessage && (
+                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+                    <CheckCircle2
+                      size={18}
+                    />
+
+                    {saveMessage}
+                  </div>
+                )}
+
+                {/* NO VALID CONTACTS */}
+
+                {validation.summary
+                  .validRows === 0 && (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    At least one valid
+                    contact is required before
+                    this import can be saved.
+                  </div>
+                )}
+
+                {/* SAVED IMPORT ID */}
+
+                {savedImportId && (
+                  <p className="mt-3 text-xs text-slate-400">
+                    Import ID:{' '}
+                    {savedImportId}
+                  </p>
+                )}
               </div>
             </>
           )}
