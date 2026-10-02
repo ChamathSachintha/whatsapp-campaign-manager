@@ -111,5 +111,10 @@ contextBridge.exposeInMainWorld(
         'campaigns:save-draft',
         options,
       ),
+
+    listSavedCampaigns: () =>
+      ipcRenderer.invoke(
+        'campaigns:list',
+      ),
   },
 );

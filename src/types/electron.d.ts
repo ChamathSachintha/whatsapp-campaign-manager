@@ -184,6 +184,26 @@ declare global {
           messageCount: number;
           mediaCount: number;
         }>;
+
+      listSavedCampaigns: () =>
+        Promise<
+          Array<{
+            id: string;
+            name: string;
+            description:
+              | string
+              | null;
+            status: string;
+            importId:
+              | string
+              | null;
+            createdAt: string;
+            updatedAt: string;
+            recipientCount: number;
+            messageCount: number;
+            mediaCount: number;
+          }>
+        >;
     };
   }
 }

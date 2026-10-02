@@ -740,3 +740,106 @@ export function saveCampaignDraft(
     mediaCount,
   };
 }
+
+/* =========================================================
+   SAVED CAMPAIGN LIST
+   ========================================================= */
+
+export type SavedCampaignListItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  importId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  recipientCount: number;
+  messageCount: number;
+  mediaCount: number;
+};
+
+export function listSavedCampaigns(): SavedCampaignListItem[] {
+  const db =
+    getDatabase();
+
+  const rows =
+    db.prepare(`
+      SELECT
+        c.id,
+        c.name,
+        c.description,
+        c.status,
+        c.import_id,
+        c.created_at,
+        c.updated_at,
+        c.total_recipients,
+
+        (
+          SELECT COUNT(*)
+          FROM campaign_messages cm
+          WHERE cm.campaign_id = c.id
+        ) AS message_count,
+
+        (
+          SELECT COUNT(*)
+          FROM campaign_messages cm
+          WHERE cm.campaign_id = c.id
+            AND cm.media_asset_id IS NOT NULL
+        ) AS media_count
+
+      FROM campaigns c
+
+      ORDER BY c.created_at DESC
+    `).all() as Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      status: string;
+      import_id: string | null;
+      created_at: string;
+      updated_at: string;
+      total_recipients: number;
+      message_count: number;
+      media_count: number;
+    }>;
+
+  return rows.map(
+    (row) => ({
+      id:
+        row.id,
+
+      name:
+        row.name,
+
+      description:
+        row.description,
+
+      status:
+        row.status,
+
+      importId:
+        row.import_id,
+
+      createdAt:
+        row.created_at,
+
+      updatedAt:
+        row.updated_at,
+
+      recipientCount:
+        Number(
+          row.total_recipients,
+        ),
+
+      messageCount:
+        Number(
+          row.message_count,
+        ),
+
+      mediaCount:
+        Number(
+          row.media_count,
+        ),
+    }),
+  );
+}

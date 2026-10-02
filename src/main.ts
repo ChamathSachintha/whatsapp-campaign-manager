@@ -10,7 +10,9 @@ import { getDatabaseHealth } from './db/health';
 
 import { detectContactColumns } from './services/imports/column-detector';
 
+
 import {
+  listSavedCampaigns,
   saveCampaignDraft,
 } from './services/campaigns/campaign-repository';
 
@@ -355,6 +357,17 @@ ipcMain.handle(
     return saveCampaignDraft(
       options,
     );
+  },
+);
+
+  /* -------------------------------------------------------
+   LIST SAVED CAMPAIGNS
+   ------------------------------------------------------- */
+
+ipcMain.handle(
+  'campaigns:list',
+  () => {
+    return listSavedCampaigns();
   },
 );
 
