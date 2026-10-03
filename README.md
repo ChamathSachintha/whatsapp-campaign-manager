@@ -1,15 +1,61 @@
-# Outreach - WhatsApp Campaign Manager
+# WhatsApp Campaign Manager
+
+Desktop campaign management application for Windows using WhatsApp Web.
+
+**Latest release:** v1.0.0<br>
+**Platform:** Windows 10 / 11<br>
+**Download:** [GitHub Releases](https://github.com/ChamathSachintha/whatsapp-campaign-manager/releases)
+
+> Normal users only need the Windows installer. Node.js, npm, Git, PowerShell, source code, a development environment, and database setup are not required.
+
+## WhatsApp Campaign Manager v1.0.0
+
+First stable Windows release of the desktop WhatsApp campaign management application. Package version: **1.0.0**; Git release/tag: **v1.0.0**.
+
+### Main features
+
+- Import and save contacts from CSV, Excel XLS/XLSX, and supported Markdown formats, with Sri Lankan phone number normalization and duplicate/invalid number detection.
+- Create campaigns with ordered sequences of text, images, images with captions, documents/files, and documents with captions.
+- Send now, schedule or reschedule campaigns, pause, resume, cancel, and retry failed recipients.
+- Connect WhatsApp Web through installed Google Chrome or Microsoft Edge and retain a local session between launches.
+- View live dashboard campaign statistics and WhatsApp connection status.
+- Review campaign history and detailed reports with recipient-level and message-level results; export CSV reports.
+- Store campaign data and application settings locally using SQLite, and access the contact/report-a-bug support link.
+
+### Windows requirements
+
+- Windows 10 or Windows 11.
+- Google Chrome or Microsoft Edge installed. The app tries Chrome first, with Edge as fallback; no bundled Chromium is included.
+- Internet connection and an active WhatsApp account.
+
+### Release installer
+
+Download **`whatsapp-campaign-manager-1.0.0 Setup.exe`** from [GitHub Releases](https://github.com/ChamathSachintha/whatsapp-campaign-manager/releases), then follow [Install and launch](#install-and-launch).
+
+The installer is generated with Electron Forge and Squirrel.Windows. The `.nupkg` and `RELEASES` files are packaging/update artifacts; they are not the normal manual download for end users.
+
+### Important WhatsApp information
+
+This application uses WhatsApp Web browser automation. It does **not** use the official WhatsApp Business Cloud API. WhatsApp Web interface changes can require an application update.
+
+Internet access and a valid WhatsApp Web session are required; you may need to scan a QR code when connecting. For scheduled campaigns, keep the PC powered on and awake, the application running, and the app-managed WhatsApp browser connected.
+
+Sending success represents what the application can directly observe through WhatsApp Web automation. It does not guarantee delivery or read status.
+
+### Privacy / local data
+
+Campaign data, contact imports, campaign history, application settings, and WhatsApp Web session information are stored locally on your computer. Reports are generated locally. Normal operation does not require a separate cloud database; WhatsApp Web still requires internet access. See [Local data and backups](#local-data-and-backups) for storage and backup details.
 
 > [!WARNING]
 > **Use at your own risk.** This application is intended only for legitimate, authorized practices and messages to recipients who have consented to receive them. Do not use it for spam, harassment, fraud, or any unlawful or unauthorized activity. You are responsible for your use of the application and for complying with applicable laws and WhatsApp's terms and policies.
 
 [![Desktop app](https://img.shields.io/badge/Desktop-Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](#what-you-can-do)
-[![Node.js requirement](https://img.shields.io/badge/Node.js-24.19.0-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#before-you-begin)
+[![Stable release](https://img.shields.io/badge/Release-v1.0.0-15803D?style=for-the-badge)](https://github.com/ChamathSachintha/whatsapp-campaign-manager/releases/tag/v1.0.0)
 [![Local storage](https://img.shields.io/badge/Storage-Local_SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](#local-data-and-backups)
 
 A desktop workspace for preparing contact lists, composing WhatsApp campaigns, scheduling messages, and reviewing sending results. Campaign data is stored locally, and WhatsApp Web runs in a separate browser managed by the application.
 
-This guide takes a new user from installation to their first campaign. Windows is the primary development environment; browser detection and packaging configuration also include macOS and Linux.
+This guide takes a new user from installation to their first campaign. The stable v1.0.0 release targets Windows 10 / 11; browser detection and packaging configuration also include macOS and Linux for development.
 
 ### Quick navigation
 
@@ -26,6 +72,7 @@ Start with **Set up the app**, then follow the numbered buttons to send your fir
 
 ## Contents
 
+- [Windows release v1.0.0](#whatsapp-campaign-manager-v100)
 - [What you can do](#what-you-can-do)
 - [Before you begin](#before-you-begin)
 - [Install and launch](#install-and-launch)
@@ -57,10 +104,10 @@ Start with **Set up the app**, then follow the numbered buttons to send your fir
 
 | Requirement         | Details                                                                                                                                                  |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop environment | A computer with a graphical desktop and a usable system tray for background operation.                                                                   |
+| Desktop environment | Windows 10 or Windows 11 with a usable system tray for background operation.                                                                              |
 | Browser             | Google Chrome or Microsoft Edge installed in a standard location. The app uses an installed browser; it does not download one.                           |
 | WhatsApp account    | An account you can link to WhatsApp Web using your phone. A WhatsApp Business account is not required.                                                   |
-| Internet connection | Required to install dependencies from source, connect WhatsApp, and send messages.                                                                       |
+| Internet connection | Required to connect WhatsApp and send messages; developers also need it to install dependencies from source.                                             |
 | Node.js and npm     | Required when running or building from source. Node.js **24.x** is the recommended baseline; the current Forge dependency requires at least **22.13.0**. |
 | Git                 | Optional if you download the source as a ZIP; needed to clone the repository.                                                                            |
 
@@ -78,18 +125,19 @@ Connect your WhatsApp account by scanning the QR code as described below. A What
 
 ## Install and launch
 
-### Option A: Use a packaged application
+### Option A: Install the Windows release (recommended for users)
 
-If the project maintainer has supplied an installer or packaged application:
+1. Download **`whatsapp-campaign-manager-1.0.0 Setup.exe`** from [GitHub Releases](https://github.com/ChamathSachintha/whatsapp-campaign-manager/releases).
+2. Run the installer.
+3. Launch **WhatsApp Campaign Manager** from Windows. Ensure Chrome or Edge is installed.
+4. Open **Settings** and select **Open WhatsApp Web** to connect WhatsApp.
+5. Scan the WhatsApp Web QR code with your phone if required, then wait for the connected status.
+6. [Import contacts](#prepare-your-contact-list).
+7. [Create a campaign](#create-and-send-your-first-campaign), add ordered messages, and send now or schedule it.
 
-1. Install or extract the package provided for your operating system.
-2. Ensure Chrome or Edge is installed.
-3. Launch **WhatsApp Campaign Manager**.
-4. Continue with [Connect WhatsApp](#connect-whatsapp).
+No developer tools or SQLite setup are needed. The application initializes its local database on first launch.
 
-This repository contains packaging configuration. A prebuilt installer or published release is not required to run from source, and this guide does not assume one is available.
-
-### Option B: Run from source
+### Option B: Run from source (developers)
 
 1. Install Node.js 24.x with npm. Restart your terminal after installation.
 2. Clone the repository using its actual URL, or download and extract the source ZIP.
@@ -357,7 +405,9 @@ npm run lint
 npm run make
 ```
 
-Configured makers include Windows Squirrel, macOS ZIP, Linux DEB, and Linux RPM. Build on the intended platform with the system tools required by its maker. Installers, signing, and publishing are not automatically provided by this repository; there is no configured release publisher.
+Configured makers include Squirrel.Windows, macOS ZIP, Linux DEB, and Linux RPM. The stable v1.0.0 distribution is the Windows installer. Build on the intended platform with the system tools required by its maker. Signing and publishing require separate configuration; there is no configured release publisher.
+
+The Windows production packaging includes `playwright-core` for runtime use through the Forge packaging hook and ASAR unpack configuration. Windows release packaging was tested successfully after fixing production packaging of `playwright-core`.
 
 Check native tray behavior and live WhatsApp automation on each target desktop before distribution, including sending a small campaign, scheduling, and closing to the tray.
 
@@ -383,11 +433,11 @@ src/
 forge.config.mts       Packaging configuration
 ```
 
-The app is built with Electron, React, TypeScript, Vite, Tailwind CSS, Playwright Core, and Node's SQLite support. All application styling is maintained in `src/styles.css`.
+The app is built with Electron, React, TypeScript, Tailwind CSS, React Router, SQLite using Node's built-in `node:sqlite`, Playwright Core for WhatsApp Web browser automation, Electron Forge, Vite, and the Squirrel.Windows installer. All application styling is maintained in `src/styles.css`.
 
 ## Maintainer
 
-**Chamath Sachintha** — `chamathsachintha2002@gmail.com`
+Created by **Chamath Sachintha** ❤️ — `chamathsachintha2002@gmail.com`
 
 [![Contact the maintainer](https://img.shields.io/badge/Contact_the_maintainer-334155?style=for-the-badge&logo=gmail&logoColor=white)](mailto:chamathsachintha2002@gmail.com)
 
