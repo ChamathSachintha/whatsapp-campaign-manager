@@ -1,4 +1,11 @@
-import { Eye, History, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
+import {
+  BarChart3,
+  Eye,
+  History,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+} from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 
@@ -7,6 +14,11 @@ import {
   type CampaignDetails,
   type CampaignMedia,
 } from '../components/CampaignDetailsViewer';
+
+import {
+  CampaignReportPanel,
+  type CampaignReportData,
+} from '../components/CampaignReportPanel';
 
 import { EmptyState } from '../components/EmptyState';
 
@@ -23,7 +35,9 @@ function formatDateTime(value: string | null) {
 
   return new Intl.DateTimeFormat('en-LK', {
     timeZone: 'Asia/Colombo',
+
     dateStyle: 'medium',
+
     timeStyle: 'short',
   }).format(new Date(value));
 }
@@ -62,6 +76,11 @@ export function HistoryPage() {
 
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  const [selectedReport, setSelectedReport] =
+    useState<CampaignReportData | null>(null);
+
+  const [loadingReport, setLoadingReport] = useState(false);
+
   async function loadCampaigns(manual = false) {
     try {
       if (manual) {
@@ -79,6 +98,7 @@ export function HistoryPage() {
       );
     } finally {
       setLoading(false);
+
       setRefreshing(false);
     }
   }
@@ -114,7 +134,11 @@ export function HistoryPage() {
   async function viewCampaign(campaignId: string) {
     try {
       setLoadingDetails(true);
+
       setError(null);
+
+      setSelectedReport(null);
+
       setMediaPreviews({});
 
       const details = await window.appAPI.getSavedCampaignDetails(campaignId);
@@ -131,6 +155,26 @@ export function HistoryPage() {
     }
   }
 
+  async function viewReport(campaignId: string) {
+    try {
+      setLoadingReport(true);
+
+      setError(null);
+
+      setSelectedCampaign(null);
+
+      const report = await window.appAPI.getCampaignReport(campaignId);
+
+      setSelectedReport(report);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to load campaign report.',
+      );
+    } finally {
+      setLoadingReport(false);
+    }
+  }
+
   async function retryCampaign(campaign: HistoryCampaign) {
     const confirmed = window.confirm(
       `Retry failed or uncertain work for "${campaign.name}"?\n\nMessages already recorded as sent will not be resent.`,
@@ -142,9 +186,14 @@ export function HistoryPage() {
 
     try {
       setBusyId(campaign.id);
+
       setError(null);
 
       await window.appAPI.retryFailedCampaign(campaign.id);
+
+      setSelectedReport(null);
+
+      setSelectedCampaign(null);
 
       setSuccess('Retryable work was returned to the queue.');
 
@@ -162,7 +211,7 @@ export function HistoryPage() {
     <>
       <PageHeader
         title="History"
-        description="Review completed, failed, and cancelled campaign execution."
+        description="Review campaign results, delivery reports, errors, and exports."
       />
 
       {error && (
@@ -191,13 +240,12 @@ export function HistoryPage() {
       ) : (
         <>
           <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b p-6">
               <div>
                 <h3 className="font-semibold">Campaign History</h3>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  “Success” means the message sequence was submitted through the
-                  WhatsApp Web UI. It does not mean read or delivered.
+                  View campaign content or open a detailed execution report.
                 </p>
               </div>
 
@@ -256,15 +304,15 @@ export function HistoryPage() {
                         </span>
                       </td>
 
-                      <td className="px-5 py-4 text-emerald-700">
+                      <td className="px-5 py-4 font-medium text-emerald-700">
                         {campaign.successCount}
                       </td>
 
-                      <td className="px-5 py-4 text-red-700">
+                      <td className="px-5 py-4 font-medium text-red-700">
                         {campaign.failureCount}
                       </td>
 
-                      <td className="px-5 py-4 text-amber-700">
+                      <td className="px-5 py-4 font-medium text-amber-700">
                         {campaign.notContactable}
                       </td>
 
@@ -278,9 +326,18 @@ export function HistoryPage() {
                             type="button"
                             onClick={() => void viewCampaign(campaign.id)}
                             className="rounded-lg border p-2"
-                            title="View"
+                            title="View Campaign"
                           >
                             <Eye size={16} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void viewReport(campaign.id)}
+                            className="rounded-lg border border-blue-200 p-2 text-blue-700"
+                            title="Campaign Report"
+                          >
+                            <BarChart3 size={16} />
                           </button>
 
                           {(campaign.failureCount > 0 ||
@@ -304,6 +361,20 @@ export function HistoryPage() {
               </table>
             </div>
           </section>
+
+          {loadingReport && (
+            <div className="mt-6 flex items-center gap-3 rounded-2xl border bg-white p-6 text-sm text-slate-500">
+              <Loader2 className="animate-spin" size={18} />
+              Loading campaign report...
+            </div>
+          )}
+
+          {selectedReport && !loadingReport && (
+            <CampaignReportPanel
+              report={selectedReport}
+              onClose={() => setSelectedReport(null)}
+            />
+          )}
 
           {loadingDetails && (
             <div className="mt-6 flex items-center gap-3 rounded-2xl border bg-white p-6">
