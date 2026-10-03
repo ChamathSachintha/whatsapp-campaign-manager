@@ -146,15 +146,30 @@ contextBridge.exposeInMainWorld('appAPI', {
 
   listCampaignHistory: () => ipcRenderer.invoke('history:list'),
 
+  getCampaignReport: (campaignId: string) =>
+    ipcRenderer.invoke('reports:get', campaignId),
+
+  exportCampaignReportCsv: (options: {
+    campaignId: string;
+
+    kind: 'summary' | 'details';
+  }) => ipcRenderer.invoke('reports:export-csv', options),
+
   getSenderSettings: () => ipcRenderer.invoke('sender:get-settings'),
 
   updateSenderSettings: (settings: {
     messageDelayMinMs: number;
+
     messageDelayMaxMs: number;
+
     recipientDelayMinMs: number;
+
     recipientDelayMaxMs: number;
+
     navigationTimeoutMs: number;
+
     actionTimeoutMs: number;
+
     mediaUploadTimeoutMs: number;
   }) => ipcRenderer.invoke('sender:update-settings', settings),
 

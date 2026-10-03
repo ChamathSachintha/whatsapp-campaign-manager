@@ -4,11 +4,17 @@ export {};
 
 type SenderSettings = {
   messageDelayMinMs: number;
+
   messageDelayMaxMs: number;
+
   recipientDelayMinMs: number;
+
   recipientDelayMaxMs: number;
+
   navigationTimeoutMs: number;
+
   actionTimeoutMs: number;
+
   mediaUploadTimeoutMs: number;
 };
 
@@ -58,6 +64,124 @@ type DeliveryCampaign = {
   mediaCount: number;
 
   uncertainCount: number;
+};
+
+type CampaignReport = {
+  summary: {
+    id: string;
+
+    name: string;
+
+    description: string | null;
+
+    status: string;
+
+    sendMode: string;
+
+    timezone: string;
+
+    createdAt: string;
+
+    updatedAt: string;
+
+    scheduledAt: string | null;
+
+    startedAt: string | null;
+
+    completedAt: string | null;
+
+    totalRecipients: number;
+
+    processedCount: number;
+
+    successCount: number;
+
+    failureCount: number;
+
+    notContactable: number;
+
+    uncertainCount: number;
+
+    successRate: number;
+  };
+
+  recipients: Array<{
+    id: string;
+
+    name: string | null;
+
+    normalizedPhone: string;
+
+    originalPhone: string | null;
+
+    status: string;
+
+    startedAt: string | null;
+
+    completedAt: string | null;
+
+    lastErrorCode: string | null;
+
+    lastErrorMessage: string | null;
+
+    deliveryCount: number;
+
+    sentCount: number;
+
+    failedCount: number;
+
+    uncertainCount: number;
+
+    skippedCount: number;
+  }>;
+
+  deliveries: Array<{
+    recipientId: string;
+
+    recipientName: string | null;
+
+    normalizedPhone: string;
+
+    originalPhone: string | null;
+
+    recipientStatus: string;
+
+    recipientStartedAt: string | null;
+
+    recipientCompletedAt: string | null;
+
+    recipientErrorCode: string | null;
+
+    recipientErrorMessage: string | null;
+
+    deliveryId: string | null;
+
+    messageId: string | null;
+
+    messagePosition: number | null;
+
+    messageType: string | null;
+
+    textContent: string | null;
+
+    caption: string | null;
+
+    mediaFilename: string | null;
+
+    deliveryStatus: string | null;
+
+    attemptCount: number;
+
+    deliveryStartedAt: string | null;
+
+    sentAt: string | null;
+
+    finishedAt: string | null;
+
+    deliveryErrorCode: string | null;
+
+    deliveryErrorMessage: string | null;
+  }>;
 };
 
 declare global {
@@ -470,25 +594,48 @@ declare global {
 
       pauseCampaign: (campaignId: string) => Promise<{
         campaignId: string;
+
         status: string;
       }>;
 
       resumeCampaign: (campaignId: string) => Promise<{
         campaignId: string;
+
         status: string;
       }>;
 
       cancelCampaignExecution: (campaignId: string) => Promise<{
         campaignId: string;
+
         status: string;
       }>;
 
       retryFailedCampaign: (campaignId: string) => Promise<{
         campaignId: string;
+
         status: string;
       }>;
 
       listCampaignHistory: () => Promise<DeliveryCampaign[]>;
+
+      getCampaignReport: (campaignId: string) => Promise<CampaignReport>;
+
+      exportCampaignReportCsv: (options: {
+        campaignId: string;
+
+        kind: 'summary' | 'details';
+      }) => Promise<
+        | {
+            canceled: true;
+          }
+        | {
+            canceled: false;
+
+            filePath: string;
+
+            fileName: string;
+          }
+      >;
 
       getSenderSettings: () => Promise<SenderSettings>;
 

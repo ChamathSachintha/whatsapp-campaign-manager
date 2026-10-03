@@ -60,6 +60,11 @@ import {
 } from './services/imports/import-repository';
 
 import {
+  exportCampaignReportCsv,
+  getCampaignReport,
+} from './services/reports/campaign-report-service';
+
+import {
   getSenderSettings,
   updateSenderSettings,
 } from './services/settings/sender-settings';
@@ -412,6 +417,23 @@ app.whenReady().then(() => {
   );
 
   ipcMain.handle('history:list', () => listCampaignHistory());
+
+  ipcMain.handle('reports:get', (_event, campaignId: string) =>
+    getCampaignReport(campaignId),
+  );
+
+  ipcMain.handle(
+    'reports:export-csv',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        kind: 'summary' | 'details';
+      },
+    ) => exportCampaignReportCsv(options.campaignId, options.kind),
+  );
 
   ipcMain.handle('sender:get-settings', () => getSenderSettings());
 
