@@ -1,4 +1,4 @@
-# Outreach — WhatsApp Campaign Manager
+# Outreach - WhatsApp Campaign Manager
 
 > [!WARNING]
 > **Use at your own risk.** This application is intended only for legitimate, authorized practices and messages to recipients who have consented to receive them. Do not use it for spam, harassment, fraud, or any unlawful or unauthorized activity. You are responsible for your use of the application and for complying with applicable laws and WhatsApp's terms and policies.
