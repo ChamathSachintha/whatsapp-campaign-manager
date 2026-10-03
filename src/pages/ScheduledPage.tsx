@@ -1,3 +1,7 @@
+import { InlineNotice } from '../components/Notifications';
+import { useFeedback, useNotifications } from '../components/Notifications';
+import { Modal } from '../components/Modal';
+import { PaginatedTable } from '../components/PaginatedTable';
 import {
   Calendar,
   Eye,
@@ -23,6 +27,7 @@ import {
 import { EmptyState } from '../components/EmptyState';
 
 import { PageHeader } from '../components/PageHeader';
+import { connectionLabel } from '../utils/connection-label';
 
 type DeliveryCampaign = Awaited<
   ReturnType<typeof window.appAPI.listDeliveryCampaigns>
@@ -107,6 +112,7 @@ function progressPercentage(campaign: DeliveryCampaign) {
 }
 
 export function ScheduledPage() {
+  const { confirm } = useNotifications();
   const [campaigns, setCampaigns] = useState<DeliveryCampaign[]>([]);
 
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus | null>(
@@ -119,9 +125,9 @@ export function ScheduledPage() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useFeedback('error');
 
-  const [success, setSuccess] = useState<string | null>(null);
+  const [, setSuccess] = useFeedback('success');
 
   const [selectedCampaign, setSelectedCampaign] =
     useState<CampaignDetails | null>(null);
@@ -232,6 +238,10 @@ export function ScheduledPage() {
       setError(null);
 
       const status = await window.appAPI.connectWhatsApp();
+      if (status.state === 'error') {
+        setError(status.message);
+        return;
+      }
 
       setWhatsappStatus(status);
 
@@ -308,9 +318,12 @@ export function ScheduledPage() {
 
   async function cancelSchedule(campaign: DeliveryCampaign) {
     if (
-      !window.confirm(
-        `Cancel the schedule for "${campaign.name}" and return it to Draft?`,
-      )
+      !(await confirm({
+        title: 'Cancel this schedule?',
+        message: `Cancel the schedule for "${campaign.name}" and return it to Draft?`,
+        confirmLabel: 'Return to draft',
+        tone: 'warning',
+      }))
     ) {
       return;
     }
@@ -335,7 +348,14 @@ export function ScheduledPage() {
   }
 
   async function returnToDraft(campaign: DeliveryCampaign) {
-    if (!window.confirm(`Return "${campaign.name}" to Draft?`)) {
+    if (
+      !(await confirm({
+        title: 'Return this campaign to draft?',
+        message: `Return "${campaign.name}" to Draft?`,
+        confirmLabel: 'Return to draft',
+        tone: 'primary',
+      }))
+    ) {
       return;
     }
 
@@ -401,9 +421,13 @@ export function ScheduledPage() {
   }
 
   async function retryFailed(campaign: DeliveryCampaign) {
-    const confirmed = window.confirm(
-      'Retry failed or uncertain work?\n\nMessages already recorded as sent will not be resent. An uncertain message may have been submitted before the app stopped, so retry it only if you accept that duplicate risk.',
-    );
+    const confirmed = await confirm({
+      title: 'Retry failed or uncertain messages?',
+      message:
+        'Retry failed or uncertain work?\n\nMessages already recorded as sent will not be resent. An uncertain message may have been submitted before the app stopped, so retry it only if you accept that duplicate risk.',
+      confirmLabel: 'Retry messages',
+      tone: 'warning',
+    });
 
     if (!confirmed) {
       return;
@@ -430,9 +454,12 @@ export function ScheduledPage() {
 
   async function cancelExecution(campaign: DeliveryCampaign) {
     if (
-      !window.confirm(
-        `Cancel "${campaign.name}"?\n\nMessages already submitted will remain recorded. Pending work will stop.`,
-      )
+      !(await confirm({
+        title: 'Stop this campaign?',
+        message: `Cancel "${campaign.name}"?\n\nMessages already submitted will remain recorded. Pending work will stop.`,
+        confirmLabel: 'Stop campaign',
+        tone: 'danger',
+      }))
     ) {
       return;
     }
@@ -490,20 +517,12 @@ export function ScheduledPage() {
   return (
     <>
       <PageHeader
-        title="Scheduled"
-        description="Manage scheduling, delivery queue, and live WhatsApp campaign execution."
+        title="Sending & schedule"
+        description="See what’s sending, what’s waiting, and what’s planned. Keep the app open while your campaigns are running."
       />
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {success}
-        </div>
+        <InlineNotice message={error} onDismiss={() => setError(null)} />
       )}
 
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5 shadow-sm">
@@ -531,7 +550,7 @@ export function ScheduledPage() {
                   : 'bg-slate-100 text-slate-600'
             }`}
           >
-            {whatsappStatus?.state ?? 'checking'}
+            {connectionLabel(whatsappStatus?.state)}
           </span>
 
           {whatsappStatus?.state !== 'connected' && (
@@ -555,7 +574,9 @@ export function ScheduledPage() {
         <EmptyState
           icon={Calendar}
           title="Nothing scheduled or queued"
-          description="Use Delivery on a draft campaign to Send Now or Schedule Later."
+          description="Open a campaign and choose Send to add it to the queue or schedule it for later."
+          actionTo="/campaigns"
+          actionLabel="Choose a campaign"
         />
       ) : (
         <>
@@ -635,7 +656,7 @@ export function ScheduledPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+              <PaginatedTable className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-5 py-3">Campaign</th>
@@ -685,14 +706,12 @@ export function ScheduledPage() {
                           <span>{progressPercentage(campaign)}%</span>
                         </div>
 
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full bg-emerald-500"
-                            style={{
-                              width: `${progressPercentage(campaign)}%`,
-                            }}
-                          />
-                        </div>
+                        <progress
+                          className="delivery-progress"
+                          max={100}
+                          value={progressPercentage(campaign)}
+                          aria-label={`Sending progress for ${campaign.name}`}
+                        />
                       </td>
 
                       <td className="px-5 py-4 text-emerald-700">
@@ -722,6 +741,7 @@ export function ScheduledPage() {
                             title="View"
                           >
                             <Eye size={16} />
+                            <span className="action-label">View</span>
                           </button>
 
                           {campaign.status === 'scheduled' && (
@@ -740,6 +760,7 @@ export function ScheduledPage() {
                                 title="Reschedule"
                               >
                                 <Calendar size={16} />
+                                <span className="action-label">Reschedule</span>
                               </button>
 
                               <button
@@ -750,6 +771,7 @@ export function ScheduledPage() {
                                 title="Send Now"
                               >
                                 <Play size={16} />
+                                <span className="action-label">Send Now</span>
                               </button>
 
                               <button
@@ -760,6 +782,9 @@ export function ScheduledPage() {
                                 title="Cancel Schedule"
                               >
                                 <X size={16} />
+                                <span className="action-label">
+                                  Cancel Schedule
+                                </span>
                               </button>
                             </>
                           )}
@@ -774,6 +799,9 @@ export function ScheduledPage() {
                                 title="Return to Draft"
                               >
                                 <RotateCcw size={16} />
+                                <span className="action-label">
+                                  Return to Draft
+                                </span>
                               </button>
 
                               <button
@@ -784,6 +812,7 @@ export function ScheduledPage() {
                                 title="Cancel"
                               >
                                 <Square size={16} />
+                                <span className="action-label">Cancel</span>
                               </button>
                             </>
                           )}
@@ -798,6 +827,7 @@ export function ScheduledPage() {
                                 title="Pause"
                               >
                                 <Pause size={16} />
+                                <span className="action-label">Pause</span>
                               </button>
 
                               <button
@@ -808,6 +838,7 @@ export function ScheduledPage() {
                                 title="Cancel"
                               >
                                 <Square size={16} />
+                                <span className="action-label">Cancel</span>
                               </button>
                             </>
                           )}
@@ -822,6 +853,7 @@ export function ScheduledPage() {
                                 title="Resume"
                               >
                                 <Play size={16} />
+                                <span className="action-label">Resume</span>
                               </button>
 
                               {(campaign.failureCount > 0 ||
@@ -834,6 +866,9 @@ export function ScheduledPage() {
                                   title="Retry failed / uncertain"
                                 >
                                   <RotateCcw size={16} />
+                                  <span className="action-label">
+                                    Retry failed / uncertain
+                                  </span>
                                 </button>
                               )}
 
@@ -845,6 +880,7 @@ export function ScheduledPage() {
                                 title="Cancel"
                               >
                                 <Square size={16} />
+                                <span className="action-label">Cancel</span>
                               </button>
                             </>
                           )}
@@ -853,7 +889,7 @@ export function ScheduledPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </PaginatedTable>
             </div>
           </section>
 
@@ -876,7 +912,12 @@ export function ScheduledPage() {
       )}
 
       {rescheduleTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+        <Modal
+          label="Change campaign schedule"
+          onClose={() => setRescheduleTarget(null)}
+          busy={busyId !== null}
+          error={error}
+        >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <div className="border-b p-6">
               <h3 className="text-lg font-semibold">Reschedule Campaign</h3>
@@ -921,7 +962,7 @@ export function ScheduledPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

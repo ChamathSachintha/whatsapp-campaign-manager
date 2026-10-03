@@ -340,6 +340,14 @@ export function initializeMessageDeliveries(campaignId: string) {
   db.exec('BEGIN IMMEDIATE TRANSACTION;');
 
   try {
+    // A pause can leave the current recipient processing. The previous executor
+    // has finished before this campaign is claimed again; retain sent deliveries.
+    db.prepare(`
+      UPDATE campaign_recipients
+      SET status = 'pending', updated_at = ?
+      WHERE campaign_id = ? AND status = 'processing'
+    `).run(now, campaignId);
+
     for (const recipient of recipients) {
       for (const message of messages) {
         insert.run(
@@ -1113,7 +1121,9 @@ export function markCampaignFailed(campaignId: string, message: string) {
   createEvent(campaignId, 'campaign_failed', message);
 }
 
-export function recoverInterruptedCampaigns() {
+export function recoverInterruptedCampaigns(
+  reason: 'restart' | 'shutdown' = 'restart',
+) {
   const db = getDatabase();
 
   const rows = db
@@ -1121,6 +1131,8 @@ export function recoverInterruptedCampaigns() {
       SELECT id
       FROM campaigns
       WHERE status = 'running'
+        OR EXISTS (SELECT 1 FROM message_deliveries d WHERE d.campaign_id = campaigns.id AND d.status = 'sending')
+        OR EXISTS (SELECT 1 FROM campaign_recipients r WHERE r.campaign_id = campaigns.id AND r.status = 'processing')
     `)
     .all() as Array<{
     id: string;
@@ -1163,7 +1175,7 @@ export function recoverInterruptedCampaigns() {
       db.prepare(`
         UPDATE campaigns
         SET
-          status = 'paused',
+          status = CASE WHEN status IN ('running', 'queued') THEN 'paused' ELSE status END,
           updated_at = ?
         WHERE id = ?
       `).run(now, row.id);
@@ -1180,8 +1192,12 @@ export function recoverInterruptedCampaigns() {
 
     createEvent(
       row.id,
-      'campaign_recovered_paused',
-      'Campaign was paused after an application restart. Any in-flight message was marked uncertain.',
+      reason === 'shutdown'
+        ? 'campaign_stopped_for_exit'
+        : 'campaign_recovered_paused',
+      reason === 'shutdown'
+        ? 'Sending stopped because the application was closed. Any in-flight message was marked uncertain.'
+        : 'Campaign was paused after an application restart. Any in-flight message was marked uncertain.',
     );
   }
 

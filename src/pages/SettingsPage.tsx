@@ -1,3 +1,5 @@
+import { InlineNotice } from '../components/Notifications';
+import { useFeedback } from '../components/Notifications';
 import {
   CheckCircle2,
   Database,
@@ -12,6 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { PageHeader } from '../components/PageHeader';
+import { connectionLabel } from '../utils/connection-label';
 
 type DatabaseHealth = {
   connected: boolean;
@@ -48,9 +51,9 @@ export function SettingsPage() {
 
   const [busy, setBusy] = useState(false);
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useFeedback('error');
 
-  const [success, setSuccess] = useState<string | null>(null);
+  const [, setSuccess] = useFeedback('success');
 
   async function loadSettings() {
     try {
@@ -97,6 +100,10 @@ export function SettingsPage() {
       setSuccess(null);
 
       const status = await window.appAPI.connectWhatsApp();
+      if (status.state === 'error') {
+        setError(status.message);
+        return;
+      }
 
       setWhatsappStatus(status);
 
@@ -196,65 +203,10 @@ export function SettingsPage() {
       />
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {success}
-        </div>
+        <InlineNotice message={error} onDismiss={() => setError(null)} />
       )}
 
       <div className="grid max-w-5xl gap-6">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-emerald-50 p-2.5">
-                <Database size={20} className="text-emerald-700" />
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-slate-900">Database</h3>
-
-                <p className="text-sm text-slate-500">Local SQLite storage</p>
-              </div>
-            </div>
-
-            {databaseHealth?.connected ? (
-              <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700">
-                <CheckCircle2 size={16} />
-                Connected
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700">
-                <XCircle size={16} />
-                Error
-              </div>
-            )}
-          </div>
-
-          {databaseHealth && (
-            <div className="mt-6">
-              <p className="text-sm text-slate-500">
-                {databaseHealth.tableCount} database tables
-              </p>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {databaseHealth.tables.map((table) => (
-                  <span
-                    key={table}
-                    className="rounded-lg border bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600"
-                  >
-                    {table}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -266,7 +218,7 @@ export function SettingsPage() {
                 <h3 className="font-semibold text-slate-900">WhatsApp Web</h3>
 
                 <p className="text-sm text-slate-500">
-                  Persistent local browser session
+                  Connect your WhatsApp account to start sending.
                 </p>
               </div>
             </div>
@@ -280,7 +232,7 @@ export function SettingsPage() {
                     : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {whatsappStatus?.state ?? 'Disconnected'}
+              {connectionLabel(whatsappStatus?.state)}
             </span>
           </div>
 
@@ -312,7 +264,7 @@ export function SettingsPage() {
               className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
             >
               <Unplug size={16} />
-              Close Browser
+              Disconnect WhatsApp
             </button>
           </div>
 
@@ -326,10 +278,11 @@ export function SettingsPage() {
         {senderSettings && (
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="border-b pb-5">
-              <h3 className="font-semibold text-slate-900">Sender pacing</h3>
+              <h3 className="font-semibold text-slate-900">Sending speed</h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                Delays are randomized between the minimum and maximum values.
+                Choose the time between messages and recipients. A random delay
+                within your range keeps a natural pace.
               </p>
             </div>
 
@@ -391,10 +344,11 @@ export function SettingsPage() {
               </label>
             </div>
 
-            <div className="mt-7 border-t pt-5">
-              <h4 className="font-semibold text-slate-900">
-                Technical timeouts
-              </h4>
+            <details className="advanced-settings mt-7">
+              <summary>
+                Advanced connection settings
+                <small>Usually no changes needed</small>
+              </summary>
 
               <div className="mt-4 grid gap-5 md:grid-cols-3">
                 <label className="text-sm font-medium text-slate-700">
@@ -441,7 +395,7 @@ export function SettingsPage() {
                 Defaults: 31 seconds navigation, 16 seconds UI actions, and 61
                 seconds media upload.
               </p>
-            </div>
+            </details>
 
             <button
               type="button"
@@ -470,6 +424,57 @@ export function SettingsPage() {
             />
           </div>
         </section>
+        <details className="advanced-settings">
+          <summary>
+            Storage & diagnostics<small>Optional technical information</small>
+          </summary>{' '}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-emerald-50 p-2.5">
+                  <Database size={20} className="text-emerald-700" />
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-slate-900">Database</h3>
+
+                  <p className="text-sm text-slate-500">Local SQLite storage</p>
+                </div>
+              </div>
+
+              {databaseHealth?.connected ? (
+                <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700">
+                  <CheckCircle2 size={16} />
+                  Connected
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700">
+                  <XCircle size={16} />
+                  Error
+                </div>
+              )}
+            </div>
+
+            {databaseHealth && (
+              <div className="mt-6">
+                <p className="text-sm text-slate-500">
+                  {databaseHealth.tableCount} database tables
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {databaseHealth.tables.map((table) => (
+                    <span
+                      key={table}
+                      className="rounded-lg border bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600"
+                    >
+                      {table}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        </details>
       </div>
     </>
   );

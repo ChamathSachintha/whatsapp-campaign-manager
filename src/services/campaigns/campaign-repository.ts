@@ -62,6 +62,7 @@ export type SaveCampaignDraftResult = {
 
 export type UpdateCampaignDraftOptions = {
   campaignId: string;
+  importId?: string;
 
   name: string;
 
@@ -530,6 +531,8 @@ export function saveCampaignDraft(
       WHERE import_id = ?
         AND validation_status = 'valid'
         AND is_duplicate = 0
+        AND is_suppressed = 0
+        AND NOT EXISTS (SELECT 1 FROM suppression_list s WHERE s.normalized_phone = import_contacts.normalized_phone)
         AND normalized_phone IS NOT NULL
         AND normalized_phone <> ''
       ORDER BY row_number ASC
@@ -1177,6 +1180,51 @@ export function updateCampaignDraft(
       WHERE campaign_id = ?
     `).run(options.campaignId);
 
+    if (options.importId !== undefined) {
+      const recipients = db
+        .prepare(`
+        SELECT id, name, original_phone, normalized_phone FROM import_contacts
+        WHERE import_id = ? AND validation_status = 'valid'
+          AND is_duplicate = 0 AND is_suppressed = 0
+          AND normalized_phone IS NOT NULL AND normalized_phone <> ''
+          AND NOT EXISTS (SELECT 1 FROM suppression_list s WHERE s.normalized_phone = import_contacts.normalized_phone)
+        ORDER BY row_number ASC
+      `)
+        .all(options.importId) as Array<{
+        id: string;
+        name: string | null;
+        original_phone: string;
+        normalized_phone: string;
+      }>;
+      if (!recipients.length)
+        throw new Error('Select a contact import with eligible recipients.');
+      db.prepare('DELETE FROM campaign_recipients WHERE campaign_id = ?').run(
+        options.campaignId,
+      );
+      const insert = db.prepare(`INSERT INTO campaign_recipients
+        (id, campaign_id, import_contact_id, name, normalized_phone, original_phone, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`);
+      for (const recipient of recipients)
+        insert.run(
+          randomUUID(),
+          options.campaignId,
+          recipient.id,
+          recipient.name,
+          recipient.normalized_phone,
+          recipient.original_phone,
+          now,
+          now,
+        );
+      db.prepare(`UPDATE campaigns SET import_id = ?, total_recipients = ?, eligible_recipients = ?,
+        processed_count = 0, success_count = 0, failure_count = 0, not_contactable = 0, suppressed_count = 0
+        WHERE id = ?`).run(
+        options.importId,
+        recipients.length,
+        recipients.length,
+        options.campaignId,
+      );
+    }
+
     options.messages.forEach((message, index) => {
       let mediaAssetId: string | null = null;
 
@@ -1290,8 +1338,12 @@ export function deleteCampaignDraft(campaignId: string): DeleteCampaignResult {
     throw new Error('Campaign was not found.');
   }
 
-  if (campaign.status !== 'draft') {
-    throw new Error('Only draft campaigns can be deleted.');
+  if (
+    !['draft', 'completed', 'failed', 'cancelled'].includes(campaign.status)
+  ) {
+    throw new Error(
+      'Only draft or finished campaigns can be deleted. Cancel active campaigns first.',
+    );
   }
 
   const messageCountRow = db
@@ -1384,6 +1436,45 @@ export function deleteCampaignDraft(campaignId: string): DeleteCampaignResult {
 /* =========================================================
    QUEUE NOW
    ========================================================= */
+
+export function reuseCampaignDraft(
+  options: SaveCampaignDraftOptions & { sourceCampaignId: string },
+) {
+  const db = getDatabase();
+  if (!getSavedCampaignDetails(options.sourceCampaignId))
+    throw new Error('Source campaign was not found.');
+  const messages = options.messages.map((message) => {
+    if (message.filePath || !message.existingMediaAssetId) return message;
+    const media = db
+      .prepare(`SELECT ma.local_path, ma.original_filename FROM media_assets ma
+      INNER JOIN campaign_messages cm ON cm.media_asset_id = ma.id
+      WHERE cm.campaign_id = ? AND ma.id = ? LIMIT 1`)
+      .get(options.sourceCampaignId, message.existingMediaAssetId) as
+      | { local_path: string; original_filename: string }
+      | undefined;
+    if (!media)
+      throw new Error('Attachment does not belong to the source campaign.');
+    return {
+      ...message,
+      filePath: media.local_path,
+      fileName: media.original_filename,
+      fileExtension: path.extname(media.local_path),
+      existingMediaAssetId: null,
+    };
+  });
+  return saveCampaignDraft({ ...options, messages });
+}
+
+export function removeExpiredCampaignHistory() {
+  const db = getDatabase();
+  const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const expired = db
+    .prepare(`SELECT id FROM campaigns WHERE status IN ('completed', 'failed', 'cancelled')
+    AND COALESCE(completed_at, updated_at) < ?`)
+    .all(cutoff) as Array<{ id: string }>;
+  for (const campaign of expired) deleteCampaignDraft(campaign.id);
+  return { deletedCount: expired.length };
+}
 
 export function queueCampaignNow(campaignId: string) {
   const db = getDatabase();

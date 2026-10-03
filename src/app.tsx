@@ -1,11 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import {
-  HashRouter,
-  Navigate,
-  Route,
-  Routes,
-} from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppLayout } from './components/AppLayout';
 import { CampaignsPage } from './pages/CampaignsPage';
@@ -15,23 +10,26 @@ import { HistoryPage } from './pages/HistoryPage';
 import { ImportContactsPage } from './pages/ImportContactsPage';
 import { ScheduledPage } from './pages/ScheduledPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { NotificationProvider } from './components/Notifications';
 
 function App() {
   return (
-    <HashRouter>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/import" element={<ImportContactsPage />} />
-          <Route path="/campaigns/new" element={<CreateCampaignPage />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/scheduled" element={<ScheduledPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+    <NotificationProvider>
+      <HashRouter>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/import" element={<ImportContactsPage />} />
+            <Route path="/campaigns/new" element={<CreateCampaignPage />} />
+            <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/scheduled" element={<ScheduledPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </HashRouter>
+    </NotificationProvider>
   );
 }
 

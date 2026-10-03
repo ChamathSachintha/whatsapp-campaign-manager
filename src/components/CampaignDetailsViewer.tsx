@@ -1,3 +1,4 @@
+import { PaginatedTable } from './PaginatedTable';
 import { FileText, Image as ImageIcon, Paperclip, Type, X } from 'lucide-react';
 
 import { useState } from 'react';
@@ -254,6 +255,7 @@ export function CampaignDetailsViewer({
             className="rounded-lg border border-slate-300 p-2 text-slate-700"
           >
             <X size={17} />
+            <span className="action-label">Close</span>
           </button>
         </div>
       </div>
@@ -421,7 +423,7 @@ export function CampaignDetailsViewer({
       {tab === 'recipients' && (
         <div className="p-6">
           <div className="max-h-[500px] overflow-auto rounded-xl border">
-            <table className="min-w-full text-left text-sm">
+            <PaginatedTable className="min-w-full text-left text-sm">
               <thead className="sticky top-0 bg-slate-50">
                 <tr>
                   <th className="px-5 py-3">Name</th>
@@ -457,7 +459,7 @@ export function CampaignDetailsViewer({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PaginatedTable>
           </div>
         </div>
       )}

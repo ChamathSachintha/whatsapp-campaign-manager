@@ -4,9 +4,7 @@ import type {
   ValidatedContact,
 } from '../../types/imports';
 
-import {
-  normalizeSriLankanPhone,
-} from './phone-normalizer';
+import { normalizeSriLankanPhone } from './phone-normalizer';
 
 export type ValidateContactsOptions = {
   rows: RawContactRow[];
@@ -19,78 +17,52 @@ export type ValidateContactsOptions = {
 export function validateContacts(
   options: ValidateContactsOptions,
 ): ContactValidationResult {
-  const {
-    rows,
-    phoneColumn,
-    nameColumn,
-  } = options;
+  const { rows, phoneColumn, nameColumn } = options;
 
-  const seenNumbers =
-    new Set<string>();
+  const seenNumbers = new Set<string>();
 
-  const contacts: ValidatedContact[] =
-    [];
+  const contacts: ValidatedContact[] = [];
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
 
-    const originalPhone =
-      row[phoneColumn]?.trim() ?? '';
+    const originalPhone = row[phoneColumn]?.trim() ?? '';
 
-    const name =
-      nameColumn
-        ? row[nameColumn]?.trim() ?? ''
-        : '';
+    const name = nameColumn ? (row[nameColumn]?.trim() ?? '') : '';
 
-    const normalization =
-      normalizeSriLankanPhone(
-        originalPhone,
-      );
+    const normalization = normalizeSriLankanPhone(originalPhone);
 
-    if (
-      !normalization.valid ||
-      !normalization.normalized
-    ) {
+    if (!normalization.valid || !normalization.normalized) {
       contacts.push({
         rowNumber,
         name,
         originalPhone,
         normalizedPhone: null,
         status: 'invalid',
-        reason:
-          normalization.reason ??
-          'Invalid phone number.',
+        reason: normalization.reason ?? 'Invalid phone number.',
         sourceRow: row,
       });
 
       return;
     }
 
-    const normalizedPhone =
-      normalization.normalized;
+    const normalizedPhone = normalization.normalized;
 
-    if (
-      seenNumbers.has(
-        normalizedPhone,
-      )
-    ) {
+    if (seenNumbers.has(normalizedPhone)) {
       contacts.push({
         rowNumber,
         name,
         originalPhone,
         normalizedPhone,
         status: 'duplicate',
-        reason:
-          'Duplicate phone number in this import file.',
+        reason: 'Duplicate phone number in this import file.',
         sourceRow: row,
       });
 
       return;
     }
 
-    seenNumbers.add(
-      normalizedPhone,
-    );
+    seenNumbers.add(normalizedPhone);
 
     contacts.push({
       rowNumber,
@@ -103,31 +75,23 @@ export function validateContacts(
     });
   });
 
-  const validRows =
-    contacts.filter(
-      (contact) =>
-        contact.status === 'valid',
-    ).length;
+  const validRows = contacts.filter(
+    (contact) => contact.status === 'valid',
+  ).length;
 
-  const invalidRows =
-    contacts.filter(
-      (contact) =>
-        contact.status === 'invalid',
-    ).length;
+  const invalidRows = contacts.filter(
+    (contact) => contact.status === 'invalid',
+  ).length;
 
-  const duplicateRows =
-    contacts.filter(
-      (contact) =>
-        contact.status ===
-        'duplicate',
-    ).length;
+  const duplicateRows = contacts.filter(
+    (contact) => contact.status === 'duplicate',
+  ).length;
 
   return {
     contacts,
 
     summary: {
-      totalRows:
-        contacts.length,
+      totalRows: contacts.length,
 
       validRows,
 

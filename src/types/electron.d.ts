@@ -187,8 +187,23 @@ type CampaignReport = {
 declare global {
   interface Window {
     appAPI: {
-      getVersion: () => Promise<string>;
-
+      getAppCloseStatus: () => Promise<
+        import('./app-lifecycle').AppCloseStatus | undefined
+      >;
+      respondToAppClose: (
+        action: import('./app-lifecycle').AppCloseAction,
+      ) => Promise<void>;
+      onAppCloseRequested: (
+        callback: (status: import('./app-lifecycle').AppCloseStatus) => void,
+      ) => () => void;
+      reuseCampaignDraft: (
+        options: import('../services/campaigns/campaign-repository').SaveCampaignDraftOptions & {
+          sourceCampaignId: string;
+        },
+      ) => Promise<
+        import('../services/campaigns/campaign-repository').SaveCampaignDraftResult
+      >;
+      removeExpiredCampaignHistory: () => Promise<{ deletedCount: number }>;
       getDatabaseHealth: () => Promise<{
         connected: boolean;
 
@@ -461,6 +476,7 @@ declare global {
 
       updateCampaignDraft: (options: {
         campaignId: string;
+        importId?: string;
 
         name: string;
 

@@ -1,8 +1,12 @@
+import { InlineNotice } from '../components/Notifications';
+import { useFeedback } from '../components/Notifications';
+import { Modal } from '../components/Modal';
+import { PaginatedTable } from '../components/PaginatedTable';
 import {
   ArrowDown,
   ArrowUp,
   Calendar,
-  Check,
+  Copy,
   Edit3,
   Eye,
   Loader2,
@@ -83,6 +87,8 @@ type EditMessage = {
 
 type EditCampaignState = {
   id: string;
+  importId: string;
+  reuse: boolean;
 
   name: string;
 
@@ -297,15 +303,18 @@ function isFutureColomboDateTime(value: string) {
 }
 
 export function CampaignsPage() {
+  const [imports, setImports] = useState<
+    Awaited<ReturnType<typeof window.appAPI.listSavedImports>>
+  >([]);
   const [campaigns, setCampaigns] = useState<SavedCampaign[]>([]);
 
   const [loading, setLoading] = useState(true);
 
   const [refreshing, setRefreshing] = useState(false);
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useFeedback('error');
 
-  const [success, setSuccess] = useState<string | null>(null);
+  const [, setSuccess] = useFeedback('success');
 
   const [selectedCampaign, setSelectedCampaign] =
     useState<CampaignDetails | null>(null);
@@ -426,15 +435,17 @@ export function CampaignsPage() {
     }
   }
 
-  async function openEdit(campaignId: string) {
+  async function openEdit(campaignId: string, reuse = false) {
     try {
       setLoadingDetails(true);
 
       setError(null);
 
       const details = await getDetails(campaignId);
+      const availableImports = await window.appAPI.listSavedImports();
+      setImports(availableImports);
 
-      if (details.status !== 'draft') {
+      if (!reuse && details.status !== 'draft') {
         throw new Error('Only draft campaigns can be edited.');
       }
 
@@ -442,8 +453,10 @@ export function CampaignsPage() {
 
       setEditCampaign({
         id: details.id,
+        importId: details.importId ?? '',
+        reuse,
 
-        name: details.name,
+        name: reuse ? `${details.name} (copy)` : details.name,
 
         description: details.description ?? '',
 
@@ -580,6 +593,7 @@ export function CampaignsPage() {
 
   const editReady = Boolean(
     editCampaign &&
+    editCampaign.importId &&
     editCampaign.name.trim() &&
     editCampaign.messages.length > 0 &&
     editCampaign.messages.every(isEditMessageComplete),
@@ -595,8 +609,9 @@ export function CampaignsPage() {
 
       setError(null);
 
-      await window.appAPI.updateCampaignDraft({
+      const options = {
         campaignId: editCampaign.id,
+        importId: editCampaign.importId,
 
         name: editCampaign.name,
 
@@ -621,13 +636,23 @@ export function CampaignsPage() {
 
           fileSizeBytes: message.newAttachment?.sizeBytes ?? null,
         })),
-      });
+      };
+      const result = editCampaign.reuse
+        ? await window.appAPI.reuseCampaignDraft({
+            ...options,
+            sourceCampaignId: editCampaign.id,
+          })
+        : await window.appAPI.updateCampaignDraft(options);
 
-      const campaignId = editCampaign.id;
+      const campaignId = result.campaignId;
 
       setEditCampaign(null);
 
-      setSuccess('Campaign draft updated successfully.');
+      setSuccess(
+        editCampaign.reuse
+          ? 'Campaign reused as a new draft.'
+          : 'Campaign draft updated successfully.',
+      );
 
       await loadCampaigns();
 
@@ -661,7 +686,7 @@ export function CampaignsPage() {
 
       setDeleteTarget(null);
 
-      setSuccess('Campaign draft deleted.');
+      setSuccess('Campaign deleted.');
 
       await loadCampaigns();
     } catch (err) {
@@ -712,7 +737,7 @@ export function CampaignsPage() {
         await window.appAPI.queueCampaignNow(deliveryTarget.id);
 
         setSuccess(
-          'Campaign is queued for the WhatsApp sender. No messages have been sent yet.',
+          'Campaign added to the queue. Sending starts when WhatsApp is connected and the sender is free. Follow progress in Sending & schedule.',
         );
       } else {
         await window.appAPI.scheduleCampaign({
@@ -762,21 +787,11 @@ export function CampaignsPage() {
     <>
       <PageHeader
         title="Campaigns"
-        description="Create, preview, edit and prepare campaign drafts for delivery."
+        description="Your message library. Edit a draft, reuse a campaign with a new contact list, or choose when to send."
       />
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          <Check size={18} />
-
-          {success}
-        </div>
+        <InlineNotice message={error} onDismiss={() => setError(null)} />
       )}
 
       {loading ? (
@@ -789,6 +804,8 @@ export function CampaignsPage() {
           icon={Megaphone}
           title="No campaigns yet"
           description="Create and save your first campaign draft."
+          actionLabel="Create your first campaign"
+          actionTo="/campaigns/new"
         />
       ) : (
         <>
@@ -851,7 +868,7 @@ export function CampaignsPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+              <PaginatedTable className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-5 py-3">Campaign</th>
@@ -904,6 +921,7 @@ export function CampaignsPage() {
                             title="View"
                           >
                             <Eye size={16} />
+                            <span className="action-label">View</span>
                           </button>
 
                           {campaign.status === 'draft' && (
@@ -915,39 +933,59 @@ export function CampaignsPage() {
                                 title="Edit"
                               >
                                 <Edit3 size={16} />
+                                <span className="action-label">Edit</span>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => openDelivery(campaign)}
                                 className="rounded-lg border border-emerald-200 p-2 text-emerald-700"
-                                title="Delivery"
+                                title="Send"
                               >
                                 <Send size={16} />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setDeleteTarget({
-                                    id: campaign.id,
-
-                                    name: campaign.name,
-                                  })
-                                }
-                                className="rounded-lg border border-red-200 p-2 text-red-600"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
+                                <span className="action-label">Send</span>
                               </button>
                             </>
+                          )}
+                          <button
+                            type="button"
+                            disabled={loadingDetails || savingEdit}
+                            onClick={() => void openEdit(campaign.id, true)}
+                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-blue-700"
+                            title="Reuse as a new draft"
+                          >
+                            <Copy size={16} />
+                            Reuse
+                          </button>
+                          {[
+                            'draft',
+                            'completed',
+                            'failed',
+                            'cancelled',
+                          ].includes(campaign.status) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeleteTarget({
+                                  id: campaign.id,
+                                  name: campaign.name,
+                                })
+                              }
+                              className="rounded-lg border border-red-200 p-2 text-red-600"
+                              title="Delete campaign"
+                            >
+                              <Trash2 size={16} />
+                              <span className="action-label">
+                                Delete campaign
+                              </span>
+                            </button>
                           )}
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </PaginatedTable>
             </div>
           </section>
 
@@ -976,7 +1014,9 @@ export function CampaignsPage() {
             <section className="mt-6 rounded-2xl border border-blue-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b p-6">
                 <div>
-                  <h3 className="text-lg font-semibold">Edit Campaign</h3>
+                  <h3 className="text-lg font-semibold">
+                    {editCampaign.reuse ? 'Reuse Campaign' : 'Edit Campaign'}
+                  </h3>
 
                   <p className="mt-1 text-sm text-slate-500">
                     Edit content and move messages to change their sending
@@ -990,17 +1030,56 @@ export function CampaignsPage() {
                   className="rounded-lg border p-2"
                 >
                   <X size={17} />
+                  <span className="action-label">Close</span>
                 </button>
               </div>
 
               <div className="space-y-6 p-6">
+                <div>
+                  <label
+                    htmlFor="edit-recipient-import"
+                    className="text-sm font-semibold"
+                  >
+                    Recipient list
+                  </label>
+                  <select
+                    id="edit-recipient-import"
+                    value={editCampaign.importId}
+                    onChange={(event) =>
+                      setEditCampaign({
+                        ...editCampaign,
+                        importId: event.target.value,
+                      })
+                    }
+                    className="mt-2 w-full rounded-xl border px-4 py-3"
+                  >
+                    <option value="">Select a contact import</option>
+                    {imports
+                      .filter((item) => item.validRows > 0)
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.filename} — {item.validRows} valid contacts
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-2 text-sm text-slate-500">
+                    The selected list replaces the recipients when saved.
+                    Suppressed contacts are excluded.
+                    {editCampaign.reuse &&
+                      ' A new draft is created; the original campaign is preserved.'}
+                  </p>
+                </div>
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-semibold">
+                    <label
+                      htmlFor="edit-campaign-name"
+                      className="text-sm font-semibold"
+                    >
                       Campaign Name
                     </label>
 
                     <input
+                      id="edit-campaign-name"
                       value={editCampaign.name}
                       onChange={(event) =>
                         setEditCampaign({
@@ -1014,9 +1093,15 @@ export function CampaignsPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-semibold">Description</label>
+                    <label
+                      htmlFor="edit-campaign-description"
+                      className="text-sm font-semibold"
+                    >
+                      Description
+                    </label>
 
                     <input
+                      id="edit-campaign-description"
                       value={editCampaign.description}
                       onChange={(event) =>
                         setEditCampaign({
@@ -1077,6 +1162,7 @@ export function CampaignsPage() {
                               className="rounded-lg border p-2 disabled:opacity-30"
                             >
                               <ArrowUp size={16} />
+                              <span className="action-label">Move up</span>
                             </button>
 
                             <button
@@ -1088,6 +1174,7 @@ export function CampaignsPage() {
                               className="rounded-lg border p-2 disabled:opacity-30"
                             >
                               <ArrowDown size={16} />
+                              <span className="action-label">Move down</span>
                             </button>
 
                             <button
@@ -1098,6 +1185,7 @@ export function CampaignsPage() {
                               className="rounded-lg border border-red-200 p-2 text-red-600"
                             >
                               <Trash2 size={16} />
+                              <span className="action-label">Remove</span>
                             </button>
                           </div>
                         </div>
@@ -1143,6 +1231,7 @@ export function CampaignsPage() {
                                     className="rounded-lg p-2 text-red-600"
                                   >
                                     <X size={16} />
+                                    <span className="action-label">Close</span>
                                   </button>
                                 </div>
                               ) : message.existingMedia ? (
@@ -1167,6 +1256,7 @@ export function CampaignsPage() {
                                     className="rounded-lg p-2 text-red-600"
                                   >
                                     <X size={16} />
+                                    <span className="action-label">Close</span>
                                   </button>
                                 </div>
                               ) : (
@@ -1244,7 +1334,7 @@ export function CampaignsPage() {
                     ) : (
                       <Save size={17} />
                     )}
-                    Save Changes
+                    {editCampaign.reuse ? 'Save New Draft' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1254,10 +1344,17 @@ export function CampaignsPage() {
       )}
 
       {deliveryTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+        <Modal
+          label="Choose when to send"
+          onClose={() => setDeliveryTarget(null)}
+          busy={savingDelivery}
+          error={error}
+        >
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <div className="border-b p-6">
-              <h3 className="text-lg font-semibold">Delivery Setup</h3>
+              <h3 className="text-lg font-semibold">
+                When would you like to send?
+              </h3>
 
               <p className="mt-2 text-sm text-slate-500">
                 Prepare <strong>{deliveryTarget.name}</strong> for the WhatsApp
@@ -1277,8 +1374,8 @@ export function CampaignsPage() {
                   <p className="font-semibold">Send Now</p>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Move this campaign to Queued. No WhatsApp messages are sent
-                    yet.
+                    Add this campaign to the queue. Sending starts when WhatsApp
+                    is connected and the sender is free.
                   </p>
                 </div>
               </label>
@@ -1355,22 +1452,29 @@ export function CampaignsPage() {
                 ) : (
                   <Send size={16} />
                 )}
-                Confirm Delivery
+                {deliveryMode === 'now'
+                  ? 'Add to sending queue'
+                  : 'Schedule campaign'}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+        <Modal
+          label="Delete campaign"
+          onClose={() => setDeleteTarget(null)}
+          busy={deleting}
+          error={error}
+        >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <div className="border-b p-6">
               <h3 className="text-lg font-semibold">Delete Campaign?</h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                This permanently removes the draft, messages, recipients and
-                stored media.
+                This permanently removes the campaign, delivery history,
+                messages, recipients and stored media.
               </p>
             </div>
 
@@ -1405,7 +1509,7 @@ export function CampaignsPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

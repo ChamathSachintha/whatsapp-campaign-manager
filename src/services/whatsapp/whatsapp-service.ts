@@ -418,6 +418,8 @@ export async function connectWhatsApp(): Promise<WhatsAppStatus> {
 }
 
 export async function disconnectWhatsApp(): Promise<WhatsAppStatus> {
+  // A browser being launched must finish opening before it can be closed.
+  if (openingPromise) await openingPromise;
   try {
     if (browserContext) {
       await browserContext.close();
