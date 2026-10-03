@@ -194,8 +194,8 @@ Create a UTF-8 CSV file with a header row:
 
 ```csv
 Name,Phone
-Recipient One,0771234567
-Recipient Two,+94772345678
+Recipient One,077xxxxxxx
+Recipient Two,+9477xxxxxxx
 ```
 
 These are format examples. Replace them with your own consenting recipients before sending. For your first test, use your own WhatsApp number.
@@ -204,10 +204,10 @@ These are format examples. Replace them with your own consenting recipients befo
 
 | Input example   | Normalized result |
 | --------------- | ----------------- |
-| `0771234567`    | `+94771234567`    |
-| `94771234567`   | `+94771234567`    |
-| `+94771234567`  | `+94771234567`    |
-| `0094771234567` | `+94771234567`    |
+| `077xxxxxxx`    | `+9477xxxxxxx`    |
+| `9477xxxxxxx`   | `+9477xxxxxxx`    |
+| `+9477xxxxxxx`  | `+9477xxxxxxx`    |
+| `009477xxxxxxx` | `+9477xxxxxxx`    |
 
 Spaces, brackets, and separators are removed during normalization. The validator checks number format; a valid format does not guarantee that the number has a WhatsApp account.
 
@@ -218,8 +218,8 @@ Markdown supports a contact table, or a simple phone-number list:
 ```markdown
 | Name          | Phone        |
 | ------------- | ------------ |
-| Recipient One | 0771234567   |
-| Recipient Two | +94772345678 |
+| Recipient One | 077xxxxxxx   |
+| Recipient Two | +9477xxxxxxx |
 ```
 
 ### Import and review
