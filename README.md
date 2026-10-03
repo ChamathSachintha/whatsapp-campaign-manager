@@ -4,7 +4,7 @@
 > **Use at your own risk.** This application is intended only for legitimate, authorized practices and messages to recipients who have consented to receive them. Do not use it for spam, harassment, fraud, or any unlawful or unauthorized activity. You are responsible for your use of the application and for complying with applicable laws and WhatsApp's terms and policies.
 
 [![Desktop app](https://img.shields.io/badge/Desktop-Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](#what-you-can-do)
-[![Node.js requirement](https://img.shields.io/badge/Node.js-24.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#before-you-begin)
+[![Node.js requirement](https://img.shields.io/badge/Node.js-24.19.0-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#before-you-begin)
 [![Local storage](https://img.shields.io/badge/Storage-Local_SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](#local-data-and-backups)
 
 A desktop workspace for preparing contact lists, composing WhatsApp campaigns, scheduling messages, and reviewing sending results. Campaign data is stored locally, and WhatsApp Web runs in a separate browser managed by the application.
