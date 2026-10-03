@@ -1,40 +1,124 @@
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-} from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+
 import path from 'node:path';
-import { parseContactFile } from './services/imports/file-parser';
+
 import started from 'electron-squirrel-startup';
-import {
-  closeDatabase,
-  initializeDatabase,
-} from './db/database';
+
+import { initializeDatabase } from './db/database';
+import { createAppLifecycle } from './services/app/app-lifecycle';
+import type { AppCloseAction } from './types/app-lifecycle';
+
 import { getDatabaseHealth } from './db/health';
 
+import {
+  cancelCampaignExecution,
+  listCampaignHistory,
+  listDeliveryCampaigns,
+  pauseRunningCampaign,
+  recoverInterruptedCampaigns,
+  resumeCampaign,
+  retryFailedCampaign,
+} from './services/campaigns/campaign-execution-repository';
+
+import { startCampaignExecutor } from './services/campaigns/campaign-executor';
+
+import { chooseCampaignAttachment } from './services/campaigns/media-picker';
+
+import {
+  cancelCampaignSchedule,
+  deleteCampaignDraft,
+  getCampaignMediaPreview,
+  getSavedCampaignDetails,
+  listSavedCampaigns,
+  listScheduledCampaigns,
+  processDueCampaigns,
+  queueCampaignNow,
+  rescheduleCampaign,
+  returnQueuedCampaignToDraft,
+  saveCampaignDraft,
+  reuseCampaignDraft,
+  removeExpiredCampaignHistory,
+  scheduleCampaign,
+  updateCampaignDraft,
+} from './services/campaigns/campaign-repository';
+
+import { startCampaignScheduler } from './services/campaigns/campaign-scheduler';
+
+import { detectContactColumns } from './services/imports/column-detector';
+
+import { validateContacts } from './services/imports/contact-validator';
+
+import { parseContactFile } from './services/imports/file-parser';
+
+import {
+  deleteSavedImport,
+  getSavedImportDetails,
+  listSavedImports,
+  saveValidatedImport,
+} from './services/imports/import-repository';
+
+import {
+  exportCampaignReportCsv,
+  getCampaignReport,
+} from './services/reports/campaign-report-service';
+
+import {
+  getSenderSettings,
+  updateSenderSettings,
+} from './services/settings/sender-settings';
+
+import {
+  connectWhatsApp,
+  disconnectWhatsApp,
+  getWhatsAppStatus,
+} from './services/whatsapp/whatsapp-service';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 if (started) {
   app.quit();
 }
+let lifecycle: ReturnType<typeof createAppLifecycle> | null = null;
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on('second-instance', () => lifecycle?.showWindow());
 
 const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     width: 1360,
+
     height: 860,
-    minWidth: 1100,
+
+    minWidth: 900,
+
     minHeight: 700,
+
     show: false,
-    backgroundColor: '#f8fafc',
+
+    backgroundColor: '#f3f6f5',
+
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
+
       contextIsolation: true,
+
       nodeIntegration: false,
+
       sandbox: true,
     },
+  });
+
+  lifecycle = createAppLifecycle(mainWindow);
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://mail.google.com/')) {
+      void shell.openExternal(url);
+
+      return { action: 'deny' };
+    }
+
+    return { action: 'deny' };
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -43,6 +127,7 @@ const createWindow = (): void => {
     void mainWindow.loadFile(
       path.join(
         __dirname,
+
         `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
       ),
     );
@@ -54,26 +139,24 @@ const createWindow = (): void => {
 };
 
 app.whenReady().then(() => {
+  if (!primaryInstance || started) return;
   initializeDatabase();
-  ipcMain.handle(
-  'database:get-health',
-  () => {
-    console.log('[IPC] database:get-health called');
 
-    const result = getDatabaseHealth();
+  const recoveredCount = recoverInterruptedCampaigns();
 
+  if (recoveredCount > 0) {
     console.log(
-      '[IPC] database health result:',
-      result,
+      `[Campaign Executor] Recovered ${recoveredCount} interrupted campaign(s) as paused.`,
     );
+  }
 
-    return result;
-  },
-);
+  startCampaignScheduler();
 
-  ipcMain.handle(
-  'imports:choose-file',
-  async () => {
+  startCampaignExecutor();
+
+  ipcMain.handle('database:get-health', () => getDatabaseHealth());
+
+  ipcMain.handle('imports:choose-file', async () => {
     const result = await dialog.showOpenDialog({
       title: 'Choose Contact File',
 
@@ -82,20 +165,13 @@ app.whenReady().then(() => {
       filters: [
         {
           name: 'Contact Files',
-          extensions: [
-            'csv',
-            'md',
-            'xlsx',
-            'xls',
-          ],
+
+          extensions: ['csv', 'md', 'xlsx', 'xls'],
         },
       ],
     });
 
-    if (
-      result.canceled ||
-      result.filePaths.length === 0
-    ) {
+    if (result.canceled || result.filePaths.length === 0) {
       return {
         canceled: true,
       };
@@ -103,8 +179,19 @@ app.whenReady().then(() => {
 
     const filePath = result.filePaths[0];
 
-    const parsed =
-      parseContactFile(filePath);
+    const parsed = parseContactFile(filePath);
+
+    const detectedColumns = detectContactColumns(parsed.columns, parsed.rows);
+
+    const validationResult = detectedColumns.phoneColumn
+      ? validateContacts({
+          rows: parsed.rows,
+
+          phoneColumn: detectedColumns.phoneColumn,
+
+          nameColumn: detectedColumns.nameColumn,
+        })
+      : null;
 
     return {
       canceled: false,
@@ -117,20 +204,291 @@ app.whenReady().then(() => {
 
       columns: parsed.columns,
 
-      sampleRows:
-        parsed.rows.slice(0, 5),
-    };
-  },
-);
+      suggestedPhoneColumn: detectedColumns.phoneColumn,
 
-  ipcMain.handle('app:get-version', () => app.getVersion());
+      suggestedNameColumn: detectedColumns.nameColumn,
+
+      sampleRows: parsed.rows.slice(0, 5),
+
+      validationResult,
+    };
+  });
+
+  ipcMain.handle('imports:list', () => listSavedImports());
+
+  ipcMain.handle('imports:get-details', (_event, importId: string) => {
+    const result = getSavedImportDetails(importId);
+
+    if (!result) {
+      throw new Error('Saved import was not found.');
+    }
+
+    return result;
+  });
+
+  ipcMain.handle(
+    'imports:validate-file',
+    (
+      _event,
+
+      options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+      },
+    ) => {
+      const parsed = parseContactFile(options.filePath);
+
+      if (!parsed.columns.includes(options.phoneColumn)) {
+        throw new Error('Selected phone column does not exist in the file.');
+      }
+
+      if (options.nameColumn && !parsed.columns.includes(options.nameColumn)) {
+        throw new Error('Selected name column does not exist in the file.');
+      }
+
+      return validateContacts({
+        rows: parsed.rows,
+
+        phoneColumn: options.phoneColumn,
+
+        nameColumn: options.nameColumn ?? null,
+      });
+    },
+  );
+
+  ipcMain.handle(
+    'imports:save',
+    (
+      _event,
+
+      options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+
+        sourceNote?: string | null;
+      },
+    ) => {
+      const parsed = parseContactFile(options.filePath);
+
+      if (!parsed.columns.includes(options.phoneColumn)) {
+        throw new Error('Selected phone column does not exist in the file.');
+      }
+
+      if (options.nameColumn && !parsed.columns.includes(options.nameColumn)) {
+        throw new Error('Selected name column does not exist in the file.');
+      }
+
+      const validationResult = validateContacts({
+        rows: parsed.rows,
+
+        phoneColumn: options.phoneColumn,
+
+        nameColumn: options.nameColumn ?? null,
+      });
+
+      return saveValidatedImport({
+        filePath: options.filePath,
+
+        fileName: parsed.fileName,
+
+        fileType: parsed.fileType,
+
+        validationResult,
+
+        sourceNote: options.sourceNote ?? null,
+      });
+    },
+  );
+
+  ipcMain.handle('imports:delete', (_event, importId: string) =>
+    deleteSavedImport(importId),
+  );
+
+  ipcMain.handle(
+    'campaigns:choose-attachment',
+    (
+      _event,
+
+      type: 'image' | 'document',
+    ) => {
+      if (type !== 'image' && type !== 'document') {
+        throw new Error('Invalid campaign attachment type.');
+      }
+
+      return chooseCampaignAttachment(type);
+    },
+  );
+
+  ipcMain.handle(
+    'campaigns:save-draft',
+    (
+      _event,
+
+      options: Parameters<typeof saveCampaignDraft>[0],
+    ) => saveCampaignDraft(options),
+  );
+
+  ipcMain.handle('campaigns:list', () => listSavedCampaigns());
+  ipcMain.handle(
+    'campaigns:reuse',
+    (_event, options: Parameters<typeof reuseCampaignDraft>[0]) =>
+      reuseCampaignDraft(options),
+  );
+  ipcMain.handle('history:remove-expired', () =>
+    removeExpiredCampaignHistory(),
+  );
+
+  ipcMain.handle('campaigns:get-details', (_event, campaignId: string) => {
+    const result = getSavedCampaignDetails(campaignId);
+
+    if (!result) {
+      throw new Error('Campaign was not found.');
+    }
+
+    return result;
+  });
+
+  ipcMain.handle(
+    'campaigns:get-media-preview',
+    (_event, mediaAssetId: string) => getCampaignMediaPreview(mediaAssetId),
+  );
+
+  ipcMain.handle(
+    'campaigns:update-draft',
+    (
+      _event,
+
+      options: Parameters<typeof updateCampaignDraft>[0],
+    ) => updateCampaignDraft(options),
+  );
+
+  ipcMain.handle('campaigns:delete', (_event, campaignId: string) =>
+    deleteCampaignDraft(campaignId),
+  );
+
+  ipcMain.handle('campaigns:queue-now', (_event, campaignId: string) =>
+    queueCampaignNow(campaignId),
+  );
+
+  ipcMain.handle(
+    'campaigns:schedule',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      },
+    ) => scheduleCampaign(options.campaignId, options.scheduledLocalDateTime),
+  );
+
+  ipcMain.handle(
+    'campaigns:reschedule',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      },
+    ) => rescheduleCampaign(options.campaignId, options.scheduledLocalDateTime),
+  );
+
+  ipcMain.handle('campaigns:cancel-schedule', (_event, campaignId: string) =>
+    cancelCampaignSchedule(campaignId),
+  );
+
+  ipcMain.handle('campaigns:return-to-draft', (_event, campaignId: string) =>
+    returnQueuedCampaignToDraft(campaignId),
+  );
+
+  ipcMain.handle('campaigns:list-scheduled', () => {
+    processDueCampaigns();
+
+    return listScheduledCampaigns();
+  });
+
+  ipcMain.handle('delivery:list', () => {
+    processDueCampaigns();
+
+    return listDeliveryCampaigns();
+  });
+
+  ipcMain.handle('delivery:pause', (_event, campaignId: string) =>
+    pauseRunningCampaign(campaignId),
+  );
+
+  ipcMain.handle('delivery:resume', (_event, campaignId: string) =>
+    resumeCampaign(campaignId),
+  );
+
+  ipcMain.handle('delivery:cancel', (_event, campaignId: string) =>
+    cancelCampaignExecution(campaignId),
+  );
+
+  ipcMain.handle('delivery:retry', (_event, campaignId: string) =>
+    retryFailedCampaign(campaignId),
+  );
+
+  ipcMain.handle('history:list', () => listCampaignHistory());
+
+  ipcMain.handle('reports:get', (_event, campaignId: string) =>
+    getCampaignReport(campaignId),
+  );
+
+  ipcMain.handle(
+    'reports:export-csv',
+    (
+      _event,
+
+      options: {
+        campaignId: string;
+
+        kind: 'summary' | 'details';
+      },
+    ) => exportCampaignReportCsv(options.campaignId, options.kind),
+  );
+
+  ipcMain.handle('sender:get-settings', () => getSenderSettings());
+
+  ipcMain.handle(
+    'sender:update-settings',
+    (
+      _event,
+
+      settings: Parameters<typeof updateSenderSettings>[0],
+    ) => updateSenderSettings(settings),
+  );
+
+  ipcMain.handle('whatsapp:connect', () => connectWhatsApp());
+
+  ipcMain.handle('whatsapp:disconnect', () => disconnectWhatsApp());
+
+  ipcMain.handle('whatsapp:get-status', () => getWhatsAppStatus());
+  ipcMain.handle('app:get-close-status', () => lifecycle?.getCloseStatus());
+  ipcMain.handle('app:close-response', (event, action: AppCloseAction) => {
+    if (
+      !lifecycle ||
+      event.sender !== BrowserWindow.getAllWindows()[0]?.webContents
+    )
+      throw new Error('Close request is unavailable.');
+    return lifecycle.respond(action);
+  });
 
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
-    }
+    } else lifecycle?.showWindow();
   });
 });
 
@@ -140,6 +498,9 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
-  closeDatabase();
+app.on('before-quit', (event) => {
+  if (lifecycle && !lifecycle.canQuit()) {
+    event.preventDefault();
+    lifecycle.requestClose();
+  }
 });

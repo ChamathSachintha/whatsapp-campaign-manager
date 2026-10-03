@@ -19,7 +19,6 @@ export function initializeDatabase(): DatabaseSync {
 
   database = new DatabaseSync(databasePath);
 
-
   database.exec(`
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
@@ -34,9 +33,7 @@ export function initializeDatabase(): DatabaseSync {
 
 export function getDatabase(): DatabaseSync {
   if (!database) {
-    throw new Error(
-      'Database has not been initialized.',
-    );
+    throw new Error('Database has not been initialized.');
   }
 
   return database;

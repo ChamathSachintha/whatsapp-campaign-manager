@@ -1,13 +1,214 @@
+import type { ContactValidationResult } from './imports';
+
 export {};
+
+type SenderSettings = {
+  messageDelayMinMs: number;
+
+  messageDelayMaxMs: number;
+
+  recipientDelayMinMs: number;
+
+  recipientDelayMaxMs: number;
+
+  navigationTimeoutMs: number;
+
+  actionTimeoutMs: number;
+
+  mediaUploadTimeoutMs: number;
+};
+
+type WhatsAppStatus = {
+  state: 'disconnected' | 'opening' | 'waiting_for_qr' | 'connected' | 'error';
+
+  message: string;
+
+  browserName: string | null;
+};
+
+type DeliveryCampaign = {
+  id: string;
+
+  name: string;
+
+  description: string | null;
+
+  status: string;
+
+  sendMode: string;
+
+  timezone: string;
+
+  scheduledAt: string | null;
+
+  startedAt: string | null;
+
+  completedAt: string | null;
+
+  createdAt: string;
+
+  updatedAt: string;
+
+  totalRecipients: number;
+
+  processedCount: number;
+
+  successCount: number;
+
+  failureCount: number;
+
+  notContactable: number;
+
+  messageCount: number;
+
+  mediaCount: number;
+
+  uncertainCount: number;
+};
+
+type CampaignReport = {
+  summary: {
+    id: string;
+
+    name: string;
+
+    description: string | null;
+
+    status: string;
+
+    sendMode: string;
+
+    timezone: string;
+
+    createdAt: string;
+
+    updatedAt: string;
+
+    scheduledAt: string | null;
+
+    startedAt: string | null;
+
+    completedAt: string | null;
+
+    totalRecipients: number;
+
+    processedCount: number;
+
+    successCount: number;
+
+    failureCount: number;
+
+    notContactable: number;
+
+    uncertainCount: number;
+
+    successRate: number;
+  };
+
+  recipients: Array<{
+    id: string;
+
+    name: string | null;
+
+    normalizedPhone: string;
+
+    originalPhone: string | null;
+
+    status: string;
+
+    startedAt: string | null;
+
+    completedAt: string | null;
+
+    lastErrorCode: string | null;
+
+    lastErrorMessage: string | null;
+
+    deliveryCount: number;
+
+    sentCount: number;
+
+    failedCount: number;
+
+    uncertainCount: number;
+
+    skippedCount: number;
+  }>;
+
+  deliveries: Array<{
+    recipientId: string;
+
+    recipientName: string | null;
+
+    normalizedPhone: string;
+
+    originalPhone: string | null;
+
+    recipientStatus: string;
+
+    recipientStartedAt: string | null;
+
+    recipientCompletedAt: string | null;
+
+    recipientErrorCode: string | null;
+
+    recipientErrorMessage: string | null;
+
+    deliveryId: string | null;
+
+    messageId: string | null;
+
+    messagePosition: number | null;
+
+    messageType: string | null;
+
+    textContent: string | null;
+
+    caption: string | null;
+
+    mediaFilename: string | null;
+
+    deliveryStatus: string | null;
+
+    attemptCount: number;
+
+    deliveryStartedAt: string | null;
+
+    sentAt: string | null;
+
+    finishedAt: string | null;
+
+    deliveryErrorCode: string | null;
+
+    deliveryErrorMessage: string | null;
+  }>;
+};
 
 declare global {
   interface Window {
     appAPI: {
-      getVersion: () => Promise<string>;
-
+      getAppCloseStatus: () => Promise<
+        import('./app-lifecycle').AppCloseStatus | undefined
+      >;
+      respondToAppClose: (
+        action: import('./app-lifecycle').AppCloseAction,
+      ) => Promise<void>;
+      onAppCloseRequested: (
+        callback: (status: import('./app-lifecycle').AppCloseStatus) => void,
+      ) => () => void;
+      reuseCampaignDraft: (
+        options: import('../services/campaigns/campaign-repository').SaveCampaignDraftOptions & {
+          sourceCampaignId: string;
+        },
+      ) => Promise<
+        import('../services/campaigns/campaign-repository').SaveCampaignDraftResult
+      >;
+      removeExpiredCampaignHistory: () => Promise<{ deletedCount: number }>;
       getDatabaseHealth: () => Promise<{
         connected: boolean;
+
         tables: string[];
+
         tableCount: number;
       }>;
 
@@ -15,15 +216,454 @@ declare global {
         canceled: boolean;
 
         filePath?: string;
+
         fileName?: string;
+
         fileType?: string;
 
         columns?: string[];
 
-        sampleRows?: Array<
-          Record<string, string>
-        >;
+        suggestedPhoneColumn?: string | null;
+
+        suggestedNameColumn?: string | null;
+
+        sampleRows?: Array<Record<string, string>>;
+
+        validationResult?: ContactValidationResult | null;
       }>;
+
+      validateContactFile: (options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+      }) => Promise<ContactValidationResult>;
+
+      saveContactImport: (options: {
+        filePath: string;
+
+        phoneColumn: string;
+
+        nameColumn?: string | null;
+
+        sourceNote?: string | null;
+      }) => Promise<{
+        importId: string;
+
+        totalRows: number;
+
+        validRows: number;
+
+        invalidRows: number;
+
+        duplicateRows: number;
+      }>;
+
+      listSavedImports: () => Promise<
+        Array<{
+          id: string;
+
+          filename: string;
+
+          fileType: string;
+
+          importedAt: string;
+
+          totalRows: number;
+
+          validRows: number;
+
+          invalidRows: number;
+
+          duplicateRows: number;
+        }>
+      >;
+
+      getSavedImportDetails: (importId: string) => Promise<{
+        id: string;
+
+        filename: string;
+
+        fileType: string;
+
+        importedAt: string;
+
+        totalRows: number;
+
+        validRows: number;
+
+        invalidRows: number;
+
+        duplicateRows: number;
+
+        contacts: Array<{
+          id: string;
+
+          name: string;
+
+          originalPhone: string;
+
+          normalizedPhone: string | null;
+
+          validationStatus: string;
+
+          validationReason: string | null;
+
+          isDuplicate: boolean;
+
+          rowNumber: number | null;
+        }>;
+      }>;
+
+      deleteSavedImport: (importId: string) => Promise<{
+        importId: string;
+
+        deletedContacts: number;
+
+        detachedCampaigns: number;
+      }>;
+
+      chooseCampaignAttachment: (type: 'image' | 'document') => Promise<
+        | {
+            canceled: true;
+          }
+        | {
+            canceled: false;
+
+            filePath: string;
+
+            fileName: string;
+
+            extension: string;
+
+            sizeBytes: number;
+          }
+      >;
+
+      saveCampaignDraft: (options: {
+        name: string;
+
+        description?: string | null;
+
+        importId: string;
+
+        messages: Array<{
+          type:
+            | 'text'
+            | 'image'
+            | 'image-caption'
+            | 'document'
+            | 'document-caption';
+
+          text?: string | null;
+
+          caption?: string | null;
+
+          filePath?: string | null;
+
+          fileName?: string | null;
+
+          fileExtension?: string | null;
+
+          fileSizeBytes?: number | null;
+        }>;
+      }) => Promise<{
+        campaignId: string;
+
+        recipientCount: number;
+
+        messageCount: number;
+
+        mediaCount: number;
+      }>;
+
+      listSavedCampaigns: () => Promise<
+        Array<{
+          id: string;
+
+          name: string;
+
+          description: string | null;
+
+          status: string;
+
+          importId: string | null;
+
+          createdAt: string;
+
+          updatedAt: string;
+
+          recipientCount: number;
+
+          messageCount: number;
+
+          mediaCount: number;
+        }>
+      >;
+
+      getSavedCampaignDetails: (campaignId: string) => Promise<{
+        id: string;
+
+        name: string;
+
+        description: string | null;
+
+        status: string;
+
+        importId: string | null;
+
+        importFilename: string | null;
+
+        createdAt: string;
+
+        updatedAt: string;
+
+        totalRecipients: number;
+
+        eligibleRecipients: number;
+
+        processedCount: number;
+
+        successCount: number;
+
+        failureCount: number;
+
+        messages: Array<{
+          id: string;
+
+          position: number;
+
+          type: string;
+
+          textContent: string | null;
+
+          caption: string | null;
+
+          media: {
+            id: string;
+
+            originalFilename: string;
+
+            mimeType: string | null;
+
+            fileSize: number | null;
+          } | null;
+        }>;
+
+        recipients: Array<{
+          id: string;
+
+          name: string | null;
+
+          normalizedPhone: string;
+
+          originalPhone: string | null;
+
+          status: string;
+        }>;
+      }>;
+
+      getCampaignMediaPreview: (mediaAssetId: string) => Promise<{
+        mediaAssetId: string;
+
+        fileName: string;
+
+        mimeType: string;
+
+        dataUrl: string;
+      }>;
+
+      updateCampaignDraft: (options: {
+        campaignId: string;
+        importId?: string;
+
+        name: string;
+
+        description?: string | null;
+
+        messages: Array<{
+          type:
+            | 'text'
+            | 'image'
+            | 'image-caption'
+            | 'document'
+            | 'document-caption';
+
+          text?: string | null;
+
+          caption?: string | null;
+
+          filePath?: string | null;
+
+          fileName?: string | null;
+
+          fileExtension?: string | null;
+
+          fileSizeBytes?: number | null;
+
+          existingMediaAssetId?: string | null;
+        }>;
+      }) => Promise<{
+        campaignId: string;
+
+        messageCount: number;
+
+        mediaCount: number;
+      }>;
+
+      deleteCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        deletedMessages: number;
+
+        deletedRecipients: number;
+
+        deletedMedia: number;
+      }>;
+
+      queueCampaignNow: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+
+        sendMode: string;
+
+        scheduledAt: null;
+
+        timezone: string;
+      }>;
+
+      scheduleCampaign: (options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      }) => Promise<{
+        campaignId: string;
+
+        status: string;
+
+        sendMode: string;
+
+        scheduledAt: string;
+
+        timezone: string;
+      }>;
+
+      rescheduleCampaign: (options: {
+        campaignId: string;
+
+        scheduledLocalDateTime: string;
+      }) => Promise<{
+        campaignId: string;
+
+        status: string;
+
+        sendMode: string;
+
+        scheduledAt: string;
+
+        timezone: string;
+      }>;
+
+      cancelCampaignSchedule: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      returnQueuedCampaignToDraft: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      listScheduledCampaigns: () => Promise<
+        Array<{
+          id: string;
+
+          name: string;
+
+          description: string | null;
+
+          status: string;
+
+          sendMode: string;
+
+          timezone: string;
+
+          scheduledAt: string | null;
+
+          createdAt: string;
+
+          updatedAt: string;
+
+          recipientCount: number;
+
+          messageCount: number;
+
+          mediaCount: number;
+        }>
+      >;
+
+      listDeliveryCampaigns: () => Promise<DeliveryCampaign[]>;
+
+      pauseCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      resumeCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      cancelCampaignExecution: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      retryFailedCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+
+        status: string;
+      }>;
+
+      listCampaignHistory: () => Promise<DeliveryCampaign[]>;
+
+      getCampaignReport: (campaignId: string) => Promise<CampaignReport>;
+
+      exportCampaignReportCsv: (options: {
+        campaignId: string;
+
+        kind: 'summary' | 'details';
+      }) => Promise<
+        | {
+            canceled: true;
+          }
+        | {
+            canceled: false;
+
+            filePath: string;
+
+            fileName: string;
+          }
+      >;
+
+      getSenderSettings: () => Promise<SenderSettings>;
+
+      updateSenderSettings: (
+        settings: SenderSettings,
+      ) => Promise<SenderSettings>;
+
+      connectWhatsApp: () => Promise<WhatsAppStatus>;
+
+      disconnectWhatsApp: () => Promise<WhatsAppStatus>;
+
+      getWhatsAppStatus: () => Promise<WhatsAppStatus>;
     };
   }
 }
