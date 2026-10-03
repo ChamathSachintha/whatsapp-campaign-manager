@@ -1,7 +1,10 @@
-# Outreach — WhatsApp Campaign Manager
+# Outreach - WhatsApp Campaign Manager
+
+> [!WARNING]
+> **Use at your own risk.** This application is intended only for legitimate, authorized practices and messages to recipients who have consented to receive them. Do not use it for spam, harassment, fraud, or any unlawful or unauthorized activity. You are responsible for your use of the application and for complying with applicable laws and WhatsApp's terms and policies.
 
 [![Desktop app](https://img.shields.io/badge/Desktop-Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](#what-you-can-do)
-[![Node.js requirement](https://img.shields.io/badge/Node.js-24.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#before-you-begin)
+[![Node.js requirement](https://img.shields.io/badge/Node.js-24.19.0-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#before-you-begin)
 [![Local storage](https://img.shields.io/badge/Storage-Local_SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](#local-data-and-backups)
 
 A desktop workspace for preparing contact lists, composing WhatsApp campaigns, scheduling messages, and reviewing sending results. Campaign data is stored locally, and WhatsApp Web runs in a separate browser managed by the application.
@@ -56,7 +59,7 @@ Start with **Set up the app**, then follow the numbered buttons to send your fir
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Desktop environment | A computer with a graphical desktop and a usable system tray for background operation.                                                                   |
 | Browser             | Google Chrome or Microsoft Edge installed in a standard location. The app uses an installed browser; it does not download one.                           |
-| WhatsApp account    | An account you can link to WhatsApp Web using your phone.                                                                                                |
+| WhatsApp account    | An account you can link to WhatsApp Web using your phone. A WhatsApp Business account is not required.                                                   |
 | Internet connection | Required to install dependencies from source, connect WhatsApp, and send messages.                                                                       |
 | Node.js and npm     | Required when running or building from source. Node.js **24.x** is the recommended baseline; the current Forge dependency requires at least **22.13.0**. |
 | Git                 | Optional if you download the source as a ZIP; needed to clone the repository.                                                                            |
@@ -66,6 +69,12 @@ An installed, packaged desktop application does **not** require Node.js, npm, or
 The current contact validator accepts **Sri Lankan numbers only**. Scheduling uses **Asia/Colombo (UTC+05:30)**, regardless of your computer's timezone.
 
 Only send to people who have agreed to receive your messages. This application automates WhatsApp Web; it does not use the official WhatsApp Business Platform. There are no API keys to configure.
+
+### Do I need a WhatsApp Business account?
+
+**No.** The current application uses Playwright to control an installed Chrome or Edge browser running **WhatsApp Web**. It does **not** integrate with the WhatsApp Business API or Meta's Cloud API. You do not need a Meta developer app, a business account, an API access token, or a webhook to set it up.
+
+Connect your WhatsApp account by scanning the QR code as described below. A WhatsApp Business account is optional; using one does not change this application's connection into an API integration.
 
 ## Install and launch
 
