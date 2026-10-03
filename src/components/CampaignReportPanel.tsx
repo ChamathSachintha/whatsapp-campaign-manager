@@ -1,3 +1,6 @@
+import { InlineNotice } from './Notifications';
+import { useFeedback } from './Notifications';
+import { PaginatedTable } from './PaginatedTable';
 import {
   AlertTriangle,
   Download,
@@ -97,9 +100,9 @@ function messageLabel(type: string | null) {
 export function CampaignReportPanel({ report, onClose }: Props) {
   const [exporting, setExporting] = useState<ExportKind | null>(null);
 
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [, setExportMessage] = useFeedback('success');
 
-  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportError, setExportError] = useFeedback('error');
 
   async function exportCsv(kind: ExportKind) {
     try {
@@ -193,20 +196,16 @@ export function CampaignReportPanel({ report, onClose }: Props) {
             className="rounded-xl border border-slate-300 p-2.5 text-slate-600"
           >
             <X size={17} />
+            <span className="action-label">Close</span>
           </button>
         </div>
       </div>
 
       {exportError && (
-        <div className="mx-6 mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {exportError}
-        </div>
-      )}
-
-      {exportMessage && (
-        <div className="mx-6 mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {exportMessage}
-        </div>
+        <InlineNotice
+          message={exportError}
+          onDismiss={() => setExportError(null)}
+        />
       )}
 
       {summary.uncertainCount > 0 && (
@@ -359,7 +358,7 @@ export function CampaignReportPanel({ report, onClose }: Props) {
         </p>
 
         <div className="mt-4 max-h-[440px] overflow-auto rounded-xl border">
-          <table className="min-w-full text-left text-sm">
+          <PaginatedTable className="min-w-full text-left text-sm">
             <thead className="sticky top-0 bg-slate-50">
               <tr>
                 <th className="px-4 py-3">Name</th>
@@ -435,7 +434,7 @@ export function CampaignReportPanel({ report, onClose }: Props) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </PaginatedTable>
         </div>
       </div>
 
@@ -449,7 +448,7 @@ export function CampaignReportPanel({ report, onClose }: Props) {
         </p>
 
         <div className="mt-4 max-h-[520px] overflow-auto rounded-xl border">
-          <table className="min-w-[1300px] text-left text-sm">
+          <PaginatedTable className="min-w-[1300px] text-left text-sm">
             <thead className="sticky top-0 bg-slate-50">
               <tr>
                 <th className="px-4 py-3">Recipient</th>
@@ -543,7 +542,7 @@ export function CampaignReportPanel({ report, onClose }: Props) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </PaginatedTable>
         </div>
 
         <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-700">

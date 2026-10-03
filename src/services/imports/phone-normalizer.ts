@@ -37,10 +37,7 @@ export function normalizeSriLankanPhone(
     nationalNumber = digits.slice(2);
   }
 
-  if (
-    !nationalNumber ||
-    !/^\d{9}$/.test(nationalNumber)
-  ) {
+  if (!nationalNumber || !/^\d{9}$/.test(nationalNumber)) {
     return {
       valid: false,
       normalized: null,

@@ -1,3 +1,8 @@
+import { InlineNotice } from '../components/Notifications';
+import { useFeedback } from '../components/Notifications';
+import { Link } from 'react-router-dom';
+import { Modal } from '../components/Modal';
+import { PaginatedTable } from '../components/PaginatedTable';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -67,7 +72,7 @@ export function ImportContactsPage() {
 
   const [loading, setLoading] = useState(false);
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useFeedback('error');
 
   const [selectedPhoneColumn, setSelectedPhoneColumn] = useState('');
 
@@ -80,7 +85,7 @@ export function ImportContactsPage() {
 
   const [savedImportId, setSavedImportId] = useState<string | null>(null);
 
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useFeedback('success');
 
   const [savedImports, setSavedImports] = useState<SavedImportItem[]>([]);
 
@@ -102,7 +107,7 @@ export function ImportContactsPage() {
 
   const [deletingImportId, setDeletingImportId] = useState<string | null>(null);
 
-  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const [, setDeleteMessage] = useFeedback('success');
 
   /* =========================================================
      LOAD SAVED IMPORTS
@@ -381,31 +386,46 @@ export function ImportContactsPage() {
   return (
     <>
       <PageHeader
-        title="Import Contacts"
-        description="Import the exact recipient list needed for a campaign."
+        title="Your contact lists"
+        description="Upload a list, check the phone numbers, and save it for your campaigns. Supported files: CSV, Excel, and Markdown."
       />
 
       {/* ERROR */}
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
+        <InlineNotice message={error} onDismiss={() => setError(null)} />
       )}
 
       {/* DELETE SUCCESS */}
 
-      {deleteMessage && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
-
-          <span>{deleteMessage}</span>
-        </div>
-      )}
-
       {/* =====================================================
           SAVED IMPORTS
           ===================================================== */}
+
+      <div className="mb-6 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+          <Upload className="text-emerald-700" size={24} />
+        </div>
+
+        <h3 className="mt-5 text-lg font-semibold text-slate-900">
+          Add a contact list
+        </h3>
+
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+          Supported formats: CSV, Markdown, XLSX and XLS.
+        </p>
+
+        <button
+          type="button"
+          onClick={chooseFile}
+          disabled={loading}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <FileSpreadsheet size={18} />
+
+          {loading ? 'Opening...' : 'Choose a file to import'}
+        </button>
+      </div>
 
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-6">
@@ -438,7 +458,7 @@ export function ImportContactsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <PaginatedTable className="min-w-full text-left text-sm">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
@@ -537,7 +557,7 @@ export function ImportContactsPage() {
                   );
                 })}
               </tbody>
-            </table>
+            </PaginatedTable>
           </div>
         )}
       </div>
@@ -628,7 +648,7 @@ export function ImportContactsPage() {
           {/* DETAILS CONTACT TABLE */}
 
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <PaginatedTable className="min-w-full text-left text-sm">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="whitespace-nowrap px-5 py-3 font-semibold text-slate-600">
@@ -704,7 +724,7 @@ export function ImportContactsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PaginatedTable>
           </div>
         </div>
       )}
@@ -712,31 +732,6 @@ export function ImportContactsPage() {
       {/* =====================================================
           FILE PICKER
           ===================================================== */}
-
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
-          <Upload className="text-emerald-700" size={24} />
-        </div>
-
-        <h3 className="mt-5 text-lg font-semibold text-slate-900">
-          Import recipient file
-        </h3>
-
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-          Supported formats: CSV, Markdown, XLSX and XLS.
-        </p>
-
-        <button
-          type="button"
-          onClick={chooseFile}
-          disabled={loading}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <FileSpreadsheet size={18} />
-
-          {loading ? 'Opening...' : 'Choose File'}
-        </button>
-      </div>
 
       {/* =====================================================
           CURRENT FILE DETAILS
@@ -937,7 +932,7 @@ export function ImportContactsPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
+                  <PaginatedTable className="min-w-full text-left text-sm">
                     <thead className="bg-slate-50">
                       <tr>
                         <th className="px-5 py-3 font-semibold text-slate-600">
@@ -1011,7 +1006,7 @@ export function ImportContactsPage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </PaginatedTable>
                 </div>
               </div>
 
@@ -1052,6 +1047,12 @@ export function ImportContactsPage() {
                     <CheckCircle2 size={18} />
 
                     {saveMessage}
+                    <Link
+                      to="/campaigns/new"
+                      className="button button-primary mt-3"
+                    >
+                      Create a campaign with your contacts
+                    </Link>
                   </div>
                 )}
               </div>
@@ -1065,7 +1066,12 @@ export function ImportContactsPage() {
           ===================================================== */}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+        <Modal
+          label="Delete contact list"
+          onClose={() => setDeleteTarget(null)}
+          busy={deletingImportId !== null}
+          error={error}
+        >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start gap-4 border-b border-slate-200 p-6">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50">
@@ -1123,7 +1129,7 @@ export function ImportContactsPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

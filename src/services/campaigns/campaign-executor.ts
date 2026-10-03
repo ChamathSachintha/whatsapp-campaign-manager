@@ -33,6 +33,7 @@ let executorTimer: ReturnType<typeof setInterval> | null = null;
 let executorBusy = false;
 
 let stopRequested = false;
+const idleWaiters: Array<() => void> = [];
 
 function randomBetween(minimum: number, maximum: number) {
   if (maximum <= minimum) {
@@ -141,6 +142,7 @@ async function executeCampaign(campaignId: string) {
 
       try {
         const chatResult = await openWhatsAppChat(recipient.normalizedPhone);
+        if (stopRequested) return;
 
         if (chatResult === 'not_contactable') {
           markRecipientNotContactable(campaignId, recipient.id);
@@ -152,6 +154,7 @@ async function executeCampaign(campaignId: string) {
 
         chatReady = true;
       } catch (error) {
+        if (stopRequested) return;
         const details = getErrorDetails(error);
 
         markRecipientFailed(recipient.id, details.code, details.message);
@@ -258,6 +261,7 @@ async function executeCampaign(campaignId: string) {
             mediaPath: message.mediaPath,
           });
 
+          if (stopRequested) return;
           markDeliverySent(delivery.id);
 
           recordCampaignEvent(
@@ -271,6 +275,7 @@ async function executeCampaign(campaignId: string) {
             },
           );
         } catch (error) {
+          if (stopRequested) return;
           const details = getErrorDetails(error);
 
           markDeliveryFailed(delivery.id, details.code, details.message);
@@ -365,6 +370,7 @@ async function executeCampaign(campaignId: string) {
 
     finishCampaignIfComplete(campaignId);
   } catch (error) {
+    if (stopRequested) return;
     const message =
       error instanceof Error
         ? error.message
@@ -385,24 +391,30 @@ async function executorTick() {
     return;
   }
 
-  const whatsappStatus = await getWhatsAppStatus();
-
-  if (whatsappStatus.state !== 'connected') {
-    return;
-  }
-
-  const campaignId = getNextQueuedCampaignId();
-
-  if (!campaignId) {
-    return;
-  }
-
   executorBusy = true;
 
   try {
+    const whatsappStatus = await getWhatsAppStatus();
+
+    if (stopRequested || whatsappStatus.state !== 'connected') {
+      return;
+    }
+
+    const campaignId = getNextQueuedCampaignId();
+
+    if (!campaignId) {
+      return;
+    }
+
     await executeCampaign(campaignId);
+  } catch (error) {
+    console.error(
+      '[Campaign Executor] Unable to process delivery queue.',
+      error,
+    );
   } finally {
     executorBusy = false;
+    for (const resolve of idleWaiters.splice(0)) resolve();
   }
 }
 
@@ -420,7 +432,7 @@ export function startCampaignExecutor() {
   }, 2000);
 }
 
-export function stopCampaignExecutor() {
+export function stopCampaignExecutor(): Promise<void> {
   stopRequested = true;
 
   if (executorTimer) {
@@ -428,4 +440,7 @@ export function stopCampaignExecutor() {
 
     executorTimer = null;
   }
+  return executorBusy
+    ? new Promise((resolve) => idleWaiters.push(resolve))
+    : Promise.resolve();
 }

@@ -1,3 +1,6 @@
+import { InlineNotice } from '../components/Notifications';
+import { useFeedback, useNotifications } from '../components/Notifications';
+import { PaginatedTable } from '../components/PaginatedTable';
 import {
   BarChart3,
   Eye,
@@ -5,6 +8,7 @@ import {
   Loader2,
   RefreshCw,
   RotateCcw,
+  Trash2,
 } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
@@ -23,6 +27,11 @@ import {
 import { EmptyState } from '../components/EmptyState';
 
 import { PageHeader } from '../components/PageHeader';
+import {
+  colomboDate,
+  historyRange,
+  type HistoryPeriod,
+} from '../utils/history-filters';
 
 type HistoryCampaign = Awaited<
   ReturnType<typeof window.appAPI.listCampaignHistory>
@@ -55,6 +64,10 @@ function statusClass(status: string) {
 }
 
 export function HistoryPage() {
+  const { confirm } = useNotifications();
+  const [period, setPeriod] = useState<HistoryPeriod>('all');
+  const [selectedDate, setSelectedDate] = useState(colomboDate());
+  const [cleaning, setCleaning] = useState(false);
   const [campaigns, setCampaigns] = useState<HistoryCampaign[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -63,9 +76,9 @@ export function HistoryPage() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useFeedback('error');
 
-  const [success, setSuccess] = useState<string | null>(null);
+  const [, setSuccess] = useFeedback('success');
 
   const [selectedCampaign, setSelectedCampaign] =
     useState<CampaignDetails | null>(null);
@@ -176,9 +189,12 @@ export function HistoryPage() {
   }
 
   async function retryCampaign(campaign: HistoryCampaign) {
-    const confirmed = window.confirm(
-      `Retry failed or uncertain work for "${campaign.name}"?\n\nMessages already recorded as sent will not be resent.`,
-    );
+    const confirmed = await confirm({
+      title: 'Retry this campaign?',
+      message: `Retry failed or uncertain work for "${campaign.name}"?\n\nMessages recorded as sent will not be resent. An uncertain message may already have been submitted, so retrying it could send it twice.`,
+      confirmLabel: 'Retry messages',
+      tone: 'warning',
+    });
 
     if (!confirmed) {
       return;
@@ -207,23 +223,98 @@ export function HistoryPage() {
     }
   }
 
+  const range = historyRange(period, selectedDate);
+  const filteredCampaigns = campaigns.filter((campaign) => {
+    const timestamp = Date.parse(campaign.completedAt ?? campaign.updatedAt);
+    return timestamp >= range.start && timestamp < range.end;
+  });
+
+  async function removeExpiredHistory() {
+    if (
+      !(await confirm({
+        title: 'Remove history older than 90 days?',
+        message:
+          'Permanently delete completed, failed, and cancelled campaigns older than 90 days, including their reports and attachments? Drafts and active campaigns will be kept.',
+        confirmLabel: 'Remove old history',
+        tone: 'danger',
+      }))
+    )
+      return;
+    try {
+      setCleaning(true);
+      setError(null);
+      const result = await window.appAPI.removeExpiredCampaignHistory();
+      setSelectedCampaign(null);
+      setSelectedReport(null);
+      setSuccess(`Removed ${result.deletedCount} expired campaigns.`);
+      await loadCampaigns(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to remove expired history.',
+      );
+    } finally {
+      setCleaning(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
-        title="History"
-        description="Review campaign results, delivery reports, errors, and exports."
+        title="Results & history"
+        description="See how your campaigns performed. Open a report for message details, export results, or retry failed messages."
       />
+      <div className="mb-6 rounded-2xl border bg-white p-5">
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="text-sm font-semibold">
+            View
+            <select
+              value={period}
+              onChange={(event) =>
+                setPeriod(event.target.value as HistoryPeriod)
+              }
+              className="ml-3 rounded-lg border px-3 py-2"
+            >
+              <option value="all">Last 90 days</option>
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="year">Year</option>
+            </select>
+          </label>
+          {period !== 'all' && (
+            <label className="text-sm font-semibold">
+              Date
+              <input
+                type="date"
+                value={selectedDate}
+                min={colomboDate(new Date(Date.now() - 90 * 86_400_000))}
+                max={colomboDate()}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                className="ml-3 rounded-lg border px-3 py-2"
+              />
+            </label>
+          )}
+          <button
+            type="button"
+            disabled={cleaning || loading || refreshing}
+            onClick={() => void removeExpiredHistory()}
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+          >
+            <Trash2 size={16} />
+            {cleaning ? 'Removing…' : 'Remove history older than 90 days'}
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Calendar periods use Asia/Colombo time; weeks start Monday. All views
+          show only the last 90 days, with 10 records per page. Cleanup is
+          manual and preserves drafts and active campaigns.
+        </p>
+      </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {success}
-        </div>
+        <InlineNotice message={error} onDismiss={() => setError(null)} />
       )}
 
       {loading ? (
@@ -231,11 +322,11 @@ export function HistoryPage() {
           <Loader2 className="animate-spin" size={18} />
           Loading history...
         </div>
-      ) : campaigns.length === 0 ? (
+      ) : filteredCampaigns.length === 0 ? (
         <EmptyState
           icon={History}
-          title="No history yet"
-          description="Completed, failed, and cancelled campaigns will appear here."
+          title="No history in this period"
+          description="Choose another date or view to see completed, failed, and cancelled campaigns from the last 90 days."
         />
       ) : (
         <>
@@ -264,7 +355,10 @@ export function HistoryPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+              <PaginatedTable
+                key={`${period}-${selectedDate}`}
+                className="min-w-full text-left text-sm"
+              >
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-5 py-3">Campaign</th>
@@ -284,7 +378,7 @@ export function HistoryPage() {
                 </thead>
 
                 <tbody className="divide-y">
-                  {campaigns.map((campaign) => (
+                  {filteredCampaigns.map((campaign) => (
                     <tr key={campaign.id}>
                       <td className="min-w-64 px-5 py-4">
                         <p className="font-semibold">{campaign.name}</p>
@@ -329,6 +423,7 @@ export function HistoryPage() {
                             title="View Campaign"
                           >
                             <Eye size={16} />
+                            <span className="action-label">View Campaign</span>
                           </button>
 
                           <button
@@ -338,6 +433,9 @@ export function HistoryPage() {
                             title="Campaign Report"
                           >
                             <BarChart3 size={16} />
+                            <span className="action-label">
+                              Campaign Report
+                            </span>
                           </button>
 
                           {(campaign.failureCount > 0 ||
@@ -351,6 +449,9 @@ export function HistoryPage() {
                               title="Retry failed / uncertain work"
                             >
                               <RotateCcw size={16} />
+                              <span className="action-label">
+                                Retry failed / uncertain work
+                              </span>
                             </button>
                           )}
                         </div>
@@ -358,7 +459,7 @@ export function HistoryPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </PaginatedTable>
             </div>
           </section>
 

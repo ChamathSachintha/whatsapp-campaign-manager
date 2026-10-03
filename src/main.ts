@@ -1,10 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 
 import path from 'node:path';
 
 import started from 'electron-squirrel-startup';
 
-import { closeDatabase, initializeDatabase } from './db/database';
+import { initializeDatabase } from './db/database';
+import { createAppLifecycle } from './services/app/app-lifecycle';
+import type { AppCloseAction } from './types/app-lifecycle';
 
 import { getDatabaseHealth } from './db/health';
 
@@ -18,10 +20,7 @@ import {
   retryFailedCampaign,
 } from './services/campaigns/campaign-execution-repository';
 
-import {
-  startCampaignExecutor,
-  stopCampaignExecutor,
-} from './services/campaigns/campaign-executor';
+import { startCampaignExecutor } from './services/campaigns/campaign-executor';
 
 import { chooseCampaignAttachment } from './services/campaigns/media-picker';
 
@@ -37,14 +36,13 @@ import {
   rescheduleCampaign,
   returnQueuedCampaignToDraft,
   saveCampaignDraft,
+  reuseCampaignDraft,
+  removeExpiredCampaignHistory,
   scheduleCampaign,
   updateCampaignDraft,
 } from './services/campaigns/campaign-repository';
 
-import {
-  startCampaignScheduler,
-  stopCampaignScheduler,
-} from './services/campaigns/campaign-scheduler';
+import { startCampaignScheduler } from './services/campaigns/campaign-scheduler';
 
 import { detectContactColumns } from './services/imports/column-detector';
 
@@ -82,6 +80,10 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 if (started) {
   app.quit();
 }
+let lifecycle: ReturnType<typeof createAppLifecycle> | null = null;
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on('second-instance', () => lifecycle?.showWindow());
 
 const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
@@ -89,13 +91,13 @@ const createWindow = (): void => {
 
     height: 860,
 
-    minWidth: 1100,
+    minWidth: 900,
 
     minHeight: 700,
 
     show: false,
 
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f3f6f5',
 
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -106,6 +108,17 @@ const createWindow = (): void => {
 
       sandbox: true,
     },
+  });
+
+  lifecycle = createAppLifecycle(mainWindow);
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://mail.google.com/')) {
+      void shell.openExternal(url);
+
+      return { action: 'deny' };
+    }
+
+    return { action: 'deny' };
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -126,6 +139,7 @@ const createWindow = (): void => {
 };
 
 app.whenReady().then(() => {
+  if (!primaryInstance || started) return;
   initializeDatabase();
 
   const recoveredCount = recoverInterruptedCampaigns();
@@ -321,6 +335,14 @@ app.whenReady().then(() => {
   );
 
   ipcMain.handle('campaigns:list', () => listSavedCampaigns());
+  ipcMain.handle(
+    'campaigns:reuse',
+    (_event, options: Parameters<typeof reuseCampaignDraft>[0]) =>
+      reuseCampaignDraft(options),
+  );
+  ipcMain.handle('history:remove-expired', () =>
+    removeExpiredCampaignHistory(),
+  );
 
   ipcMain.handle('campaigns:get-details', (_event, campaignId: string) => {
     const result = getSavedCampaignDetails(campaignId);
@@ -451,15 +473,22 @@ app.whenReady().then(() => {
   ipcMain.handle('whatsapp:disconnect', () => disconnectWhatsApp());
 
   ipcMain.handle('whatsapp:get-status', () => getWhatsAppStatus());
-
-  ipcMain.handle('app:get-version', () => app.getVersion());
+  ipcMain.handle('app:get-close-status', () => lifecycle?.getCloseStatus());
+  ipcMain.handle('app:close-response', (event, action: AppCloseAction) => {
+    if (
+      !lifecycle ||
+      event.sender !== BrowserWindow.getAllWindows()[0]?.webContents
+    )
+      throw new Error('Close request is unavailable.');
+    return lifecycle.respond(action);
+  });
 
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
-    }
+    } else lifecycle?.showWindow();
   });
 });
 
@@ -469,12 +498,9 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
-  stopCampaignExecutor();
-
-  stopCampaignScheduler();
-
-  void disconnectWhatsApp();
-
-  closeDatabase();
+app.on('before-quit', (event) => {
+  if (lifecycle && !lifecycle.canQuit()) {
+    event.preventDefault();
+    lifecycle.requestClose();
+  }
 });

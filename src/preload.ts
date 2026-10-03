@@ -1,8 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('appAPI', {
-  getVersion: () => ipcRenderer.invoke('app:get-version'),
-
+  getAppCloseStatus: () => ipcRenderer.invoke('app:get-close-status'),
+  respondToAppClose: (action: import('./types/app-lifecycle').AppCloseAction) =>
+    ipcRenderer.invoke('app:close-response', action),
+  onAppCloseRequested: (
+    callback: (status: import('./types/app-lifecycle').AppCloseStatus) => void,
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      status: import('./types/app-lifecycle').AppCloseStatus,
+    ) => callback(status);
+    ipcRenderer.on('app:close-requested', listener);
+    return () => ipcRenderer.removeListener('app:close-requested', listener);
+  },
   getDatabaseHealth: () => ipcRenderer.invoke('database:get-health'),
 
   chooseContactFile: () => ipcRenderer.invoke('imports:choose-file'),
@@ -66,6 +77,13 @@ contextBridge.exposeInMainWorld('appAPI', {
   }) => ipcRenderer.invoke('campaigns:save-draft', options),
 
   listSavedCampaigns: () => ipcRenderer.invoke('campaigns:list'),
+  reuseCampaignDraft: (
+    options: import('./services/campaigns/campaign-repository').SaveCampaignDraftOptions & {
+      sourceCampaignId: string;
+    },
+  ) => ipcRenderer.invoke('campaigns:reuse', options),
+  removeExpiredCampaignHistory: () =>
+    ipcRenderer.invoke('history:remove-expired'),
 
   getSavedCampaignDetails: (campaignId: string) =>
     ipcRenderer.invoke('campaigns:get-details', campaignId),
@@ -75,6 +93,7 @@ contextBridge.exposeInMainWorld('appAPI', {
 
   updateCampaignDraft: (options: {
     campaignId: string;
+    importId?: string;
 
     name: string;
 

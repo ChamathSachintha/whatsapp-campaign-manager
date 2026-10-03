@@ -1,14 +1,9 @@
-export type RawContactRow =
-  Record<string, string>;
+export type RawContactRow = Record<string, string>;
 
 export type ParsedContactFile = {
   fileName: string;
 
-  fileType:
-    | 'csv'
-    | 'md'
-    | 'xlsx'
-    | 'xls';
+  fileType: 'csv' | 'md' | 'xlsx' | 'xls';
 
   columns: string[];
 
@@ -32,20 +27,14 @@ export type ContactFileInspection = {
 
   sampleRows?: RawContactRow[];
 
-  validationResult?:
-  | ContactValidationResult
-  | null;
-  
+  validationResult?: ContactValidationResult | null;
 };
 
 /* =========================================================
    CONTACT VALIDATION
    ========================================================= */
 
-export type ContactRowStatus =
-  | 'valid'
-  | 'invalid'
-  | 'duplicate';
+export type ContactRowStatus = 'valid' | 'invalid' | 'duplicate';
 
 export type ValidatedContact = {
   rowNumber: number;

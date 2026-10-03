@@ -1,33 +1,22 @@
-import type {
-  RawContactRow,
-} from '../../types/imports';
+import type { RawContactRow } from '../../types/imports';
 
-import {
-  normalizeSriLankanPhone,
-} from './phone-normalizer';
+import { normalizeSriLankanPhone } from './phone-normalizer';
 
 export type DetectedContactColumns = {
   phoneColumn: string | null;
   nameColumn: string | null;
 };
 
-function normalizeHeader(
-  header: string,
-): string {
-  return header
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
+function normalizeHeader(header: string): string {
+  return header.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 /* =========================================================
    PHONE COLUMN DETECTION
    ========================================================= */
 
-function getPhoneHeaderScore(
-  column: string,
-): number {
-  const normalized =
-    normalizeHeader(column);
+function getPhoneHeaderScore(column: string): number {
+  const normalized = normalizeHeader(column);
 
   const exactMatches = [
     'phone',
@@ -41,59 +30,41 @@ function getPhoneHeaderScore(
     'telephonenumber',
   ];
 
-  if (
-    exactMatches.includes(normalized)
-  ) {
+  if (exactMatches.includes(normalized)) {
     return 100;
   }
 
-  if (
-    normalized.includes('whatsapp')
-  ) {
+  if (normalized.includes('whatsapp')) {
     return 95;
   }
 
-  if (
-    normalized.includes('mobile')
-  ) {
+  if (normalized.includes('mobile')) {
     return 90;
   }
 
-  if (
-    normalized.includes('phone')
-  ) {
+  if (normalized.includes('phone')) {
     return 90;
   }
 
-  if (
-    normalized.includes('telephone')
-  ) {
+  if (normalized.includes('telephone')) {
     return 85;
   }
 
-  if (
-    normalized.includes('contact') &&
-    normalized.includes('number')
-  ) {
+  if (normalized.includes('contact') && normalized.includes('number')) {
     return 85;
   }
 
   return 0;
 }
 
-function getPhoneValueScore(
-  column: string,
-  rows: RawContactRow[],
-): number {
-  const sampleRows =
-    rows.slice(0, 20);
+function getPhoneValueScore(column: string, rows: RawContactRow[]): number {
+  const sampleRows = rows.slice(0, 20);
 
   let nonEmpty = 0;
   let valid = 0;
 
   for (const row of sampleRows) {
-    const value =
-      row[column]?.trim();
+    const value = row[column]?.trim();
 
     if (!value) {
       continue;
@@ -101,8 +72,7 @@ function getPhoneValueScore(
 
     nonEmpty++;
 
-    const result =
-      normalizeSriLankanPhone(value);
+    const result = normalizeSriLankanPhone(value);
 
     if (result.valid) {
       valid++;
@@ -113,34 +83,23 @@ function getPhoneValueScore(
     return 0;
   }
 
-  return (
-    valid /
-    nonEmpty
-  ) * 100;
+  return (valid / nonEmpty) * 100;
 }
 
 function detectPhoneColumn(
   columns: string[],
   rows: RawContactRow[],
 ): string | null {
-  let bestColumn: string | null =
-    null;
+  let bestColumn: string | null = null;
 
   let bestScore = 0;
 
   for (const column of columns) {
-    const headerScore =
-      getPhoneHeaderScore(column);
+    const headerScore = getPhoneHeaderScore(column);
 
-    const valueScore =
-      getPhoneValueScore(
-        column,
-        rows,
-      );
+    const valueScore = getPhoneValueScore(column, rows);
 
-    const score =
-      headerScore +
-      valueScore;
+    const score = headerScore + valueScore;
 
     if (score > bestScore) {
       bestScore = score;
@@ -164,11 +123,8 @@ function detectPhoneColumn(
    NAME COLUMN DETECTION
    ========================================================= */
 
-function getNameHeaderScore(
-  column: string,
-): number {
-  const normalized =
-    normalizeHeader(column);
+function getNameHeaderScore(column: string): number {
+  const normalized = normalizeHeader(column);
 
   const exactMatches = [
     'name',
@@ -181,38 +137,28 @@ function getNameHeaderScore(
     'customername',
   ];
 
-  if (
-    exactMatches.includes(normalized)
-  ) {
+  if (exactMatches.includes(normalized)) {
     return 100;
   }
 
-  if (
-    normalized.includes('fullname')
-  ) {
+  if (normalized.includes('fullname')) {
     return 95;
   }
 
-  if (
-    normalized.includes('name')
-  ) {
+  if (normalized.includes('name')) {
     return 80;
   }
 
   return 0;
 }
 
-function detectNameColumn(
-  columns: string[],
-): string | null {
-  let bestColumn: string | null =
-    null;
+function detectNameColumn(columns: string[]): string | null {
+  let bestColumn: string | null = null;
 
   let bestScore = 0;
 
   for (const column of columns) {
-    const score =
-      getNameHeaderScore(column);
+    const score = getNameHeaderScore(column);
 
     if (score > bestScore) {
       bestScore = score;
@@ -236,15 +182,8 @@ export function detectContactColumns(
   rows: RawContactRow[],
 ): DetectedContactColumns {
   return {
-    phoneColumn:
-      detectPhoneColumn(
-        columns,
-        rows,
-      ),
+    phoneColumn: detectPhoneColumn(columns, rows),
 
-    nameColumn:
-      detectNameColumn(
-        columns,
-      ),
+    nameColumn: detectNameColumn(columns),
   };
 }
