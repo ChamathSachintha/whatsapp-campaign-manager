@@ -1,10 +1,13 @@
-import type { ForgeConfig } from '@electron-forge/shared-types';
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
-import { MakerZIP } from '@electron-forge/maker-zip';
+import { cp, mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
+
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
-import { VitePlugin } from '@electron-forge/plugin-vite';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
+import { VitePlugin } from '@electron-forge/plugin-vite';
+import type { ForgeConfig } from '@electron-forge/shared-types';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
@@ -56,6 +59,36 @@ const config: ForgeConfig = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+
+  hooks: {
+    packageAfterPrune: async (_forgeConfig, buildPath) => {
+      const source = path.resolve(
+        process.cwd(),
+        'node_modules',
+        'playwright-core',
+      );
+
+      const destination = path.join(
+        buildPath,
+        'node_modules',
+        'playwright-core',
+      );
+
+      await rm(destination, {
+        recursive: true,
+        force: true,
+      });
+
+      await mkdir(path.dirname(destination), {
+        recursive: true,
+      });
+
+      await cp(source, destination, {
+        recursive: true,
+        force: true,
+      });
+    },
+  },
 };
 
 export default config;
