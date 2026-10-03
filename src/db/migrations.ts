@@ -1,5 +1,15 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+const DEFAULT_SENDER_SETTINGS = {
+  messageDelayMinMs: 7000,
+  messageDelayMaxMs: 10000,
+  recipientDelayMinMs: 10000,
+  recipientDelayMaxMs: 18000,
+  navigationTimeoutMs: 31000,
+  actionTimeoutMs: 16000,
+  mediaUploadTimeoutMs: 61000,
+};
+
 export function runMigrations(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS imports (
@@ -267,6 +277,10 @@ export function runMigrations(db: DatabaseSync): void {
       ON campaign_recipients(normalized_phone);
 
 
+    CREATE INDEX IF NOT EXISTS idx_campaign_recipients_status
+      ON campaign_recipients(campaign_id, status);
+
+
     CREATE INDEX IF NOT EXISTS idx_message_deliveries_campaign
       ON message_deliveries(campaign_id);
 
@@ -275,13 +289,39 @@ export function runMigrations(db: DatabaseSync): void {
       ON message_deliveries(campaign_recipient_id);
 
 
+    CREATE INDEX IF NOT EXISTS idx_message_deliveries_status
+      ON message_deliveries(campaign_id, status);
+
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_message_delivery_unique
+      ON message_deliveries(
+        campaign_recipient_id,
+        campaign_message_id
+      );
+
+
     CREATE INDEX IF NOT EXISTS idx_campaign_status
       ON campaigns(status);
 
 
     CREATE INDEX IF NOT EXISTS idx_campaign_schedule
       ON campaigns(scheduled_at);
+
+
+    CREATE INDEX IF NOT EXISTS idx_campaign_events_campaign
+      ON campaign_events(campaign_id, created_at);
   `);
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT OR IGNORE INTO app_settings (
+      key,
+      value_json,
+      updated_at
+    )
+    VALUES (?, ?, ?)
+  `).run('sender', JSON.stringify(DEFAULT_SENDER_SETTINGS), now);
 
   console.log('[Database] Migrations completed');
 }

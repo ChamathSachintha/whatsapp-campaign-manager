@@ -1,13 +1,13 @@
 import {
   Calendar,
-  Check,
-  Clock,
   Eye,
   Loader2,
-  MessageSquare,
+  Pause,
   Play,
   RefreshCw,
   RotateCcw,
+  Smartphone,
+  Square,
   Users,
   X,
 } from 'lucide-react';
@@ -24,42 +24,22 @@ import { EmptyState } from '../components/EmptyState';
 
 import { PageHeader } from '../components/PageHeader';
 
-type ScheduledCampaign = {
-  id: string;
+type DeliveryCampaign = Awaited<
+  ReturnType<typeof window.appAPI.listDeliveryCampaigns>
+>[number];
 
-  name: string;
-
-  description: string | null;
-
-  status: string;
-
-  sendMode: string;
-
-  timezone: string;
-
-  scheduledAt: string | null;
-
-  createdAt: string;
-
-  updatedAt: string;
-
-  recipientCount: number;
-
-  messageCount: number;
-
-  mediaCount: number;
-};
+type WhatsAppStatus = Awaited<
+  ReturnType<typeof window.appAPI.getWhatsAppStatus>
+>;
 
 function formatColomboDateTime(value: string | null) {
   if (!value) {
-    return 'Send ASAP';
+    return '—';
   }
 
   return new Intl.DateTimeFormat('en-LK', {
     timeZone: 'Asia/Colombo',
-
     dateStyle: 'medium',
-
     timeStyle: 'short',
   }).format(new Date(value));
 }
@@ -71,13 +51,9 @@ function isoToColomboInput(value: string | null) {
     timeZone: 'Asia/Colombo',
 
     year: 'numeric',
-
     month: '2-digit',
-
     day: '2-digit',
-
     hour: '2-digit',
-
     minute: '2-digit',
 
     hourCycle: 'h23',
@@ -100,16 +76,42 @@ function isFutureColomboDateTime(value: string) {
   return Number.isFinite(timestamp) && timestamp > Date.now();
 }
 
-function getStatusClass(status: string) {
-  if (status === 'scheduled') {
-    return 'border-blue-200 bg-blue-50 text-blue-700';
+function statusClass(status: string) {
+  switch (status) {
+    case 'scheduled':
+      return 'border-blue-200 bg-blue-50 text-blue-700';
+
+    case 'queued':
+      return 'border-violet-200 bg-violet-50 text-violet-700';
+
+    case 'running':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+
+    case 'paused':
+      return 'border-amber-200 bg-amber-50 text-amber-700';
+
+    default:
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+  }
+}
+
+function progressPercentage(campaign: DeliveryCampaign) {
+  if (campaign.totalRecipients === 0) {
+    return 0;
   }
 
-  return 'border-violet-200 bg-violet-50 text-violet-700';
+  return Math.min(
+    100,
+    Math.round((campaign.processedCount / campaign.totalRecipients) * 100),
+  );
 }
 
 export function ScheduledPage() {
-  const [campaigns, setCampaigns] = useState<ScheduledCampaign[]>([]);
+  const [campaigns, setCampaigns] = useState<DeliveryCampaign[]>([]);
+
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus | null>(
+    null,
+  );
 
   const [loading, setLoading] = useState(true);
 
@@ -131,50 +133,52 @@ export function ScheduledPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [rescheduleTarget, setRescheduleTarget] =
-    useState<ScheduledCampaign | null>(null);
+    useState<DeliveryCampaign | null>(null);
 
   const [rescheduleValue, setRescheduleValue] = useState('');
 
-  const [cancelTarget, setCancelTarget] = useState<ScheduledCampaign | null>(
-    null,
-  );
-
-  const [returnTarget, setReturnTarget] = useState<ScheduledCampaign | null>(
-    null,
-  );
-
-  async function loadCampaigns(manualRefresh = false) {
+  async function loadCampaigns(options?: {
+    manual?: boolean;
+    initial?: boolean;
+  }) {
     try {
-      if (manualRefresh) {
+      if (options?.manual) {
         setRefreshing(true);
-      } else {
-        setLoading(true);
       }
 
       setError(null);
 
-      const result = await window.appAPI.listScheduledCampaigns();
+      const [result, whatsapp] = await Promise.all([
+        window.appAPI.listDeliveryCampaigns(),
+        window.appAPI.getWhatsAppStatus(),
+      ]);
 
       setCampaigns(result);
+
+      setWhatsappStatus(whatsapp);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to load scheduled campaigns.',
+        err instanceof Error ? err.message : 'Unable to load delivery queue.',
       );
     } finally {
-      setLoading(false);
+      if (options?.initial !== false) {
+        setLoading(false);
+      }
 
       setRefreshing(false);
     }
   }
 
   useEffect(() => {
-    void loadCampaigns();
+    void loadCampaigns({
+      initial: true,
+    });
 
     const timer = window.setInterval(() => {
-      void loadCampaigns();
-    }, 30_000);
+      void loadCampaigns({
+        initial: false,
+      });
+    }, 3000);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -206,9 +210,7 @@ export function ScheduledPage() {
   async function viewCampaign(campaignId: string) {
     try {
       setLoadingDetails(true);
-
       setError(null);
-
       setMediaPreviews({});
 
       const details = await window.appAPI.getSavedCampaignDetails(campaignId);
@@ -225,19 +227,38 @@ export function ScheduledPage() {
     }
   }
 
-  async function sendNow(campaign: ScheduledCampaign) {
+  async function connectWhatsApp() {
+    try {
+      setError(null);
+
+      const status = await window.appAPI.connectWhatsApp();
+
+      setWhatsappStatus(status);
+
+      setSuccess(
+        status.state === 'connected'
+          ? 'WhatsApp Web connected.'
+          : 'WhatsApp Web opened. Scan the QR code if requested.',
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to open WhatsApp Web.',
+      );
+    }
+  }
+
+  async function sendNow(campaign: DeliveryCampaign) {
     try {
       setBusyId(campaign.id);
-
       setError(null);
 
       await window.appAPI.queueCampaignNow(campaign.id);
 
-      setSuccess(
-        'Campaign moved to Queued. No WhatsApp messages have been sent yet.',
-      );
+      setSuccess('Campaign moved to the delivery queue.');
 
-      await loadCampaigns();
+      await loadCampaigns({
+        initial: false,
+      });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Unable to queue campaign.',
@@ -273,7 +294,9 @@ export function ScheduledPage() {
 
       setSuccess('Campaign rescheduled successfully.');
 
-      await loadCampaigns();
+      await loadCampaigns({
+        initial: false,
+      });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Unable to reschedule campaign.',
@@ -283,56 +306,150 @@ export function ScheduledPage() {
     }
   }
 
-  async function confirmCancelSchedule() {
-    if (!cancelTarget) {
+  async function cancelSchedule(campaign: DeliveryCampaign) {
+    if (
+      !window.confirm(
+        `Cancel the schedule for "${campaign.name}" and return it to Draft?`,
+      )
+    ) {
       return;
     }
 
     try {
-      setBusyId(cancelTarget.id);
+      setBusyId(campaign.id);
 
-      setError(null);
-
-      await window.appAPI.cancelCampaignSchedule(cancelTarget.id);
-
-      setCancelTarget(null);
+      await window.appAPI.cancelCampaignSchedule(campaign.id);
 
       setSuccess('Schedule cancelled. Campaign returned to Draft.');
 
-      await loadCampaigns();
+      await loadCampaigns({
+        initial: false,
+      });
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to cancel campaign schedule.',
+        err instanceof Error ? err.message : 'Unable to cancel schedule.',
       );
     } finally {
       setBusyId(null);
     }
   }
 
-  async function confirmReturnToDraft() {
-    if (!returnTarget) {
+  async function returnToDraft(campaign: DeliveryCampaign) {
+    if (!window.confirm(`Return "${campaign.name}" to Draft?`)) {
       return;
     }
 
     try {
-      setBusyId(returnTarget.id);
+      setBusyId(campaign.id);
 
-      setError(null);
-
-      await window.appAPI.returnQueuedCampaignToDraft(returnTarget.id);
-
-      setReturnTarget(null);
+      await window.appAPI.returnQueuedCampaignToDraft(campaign.id);
 
       setSuccess('Queued campaign returned to Draft.');
 
-      await loadCampaigns();
+      await loadCampaigns({
+        initial: false,
+      });
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to return campaign to draft.',
+          : 'Unable to return campaign to Draft.',
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function pauseCampaign(campaign: DeliveryCampaign) {
+    try {
+      setBusyId(campaign.id);
+
+      await window.appAPI.pauseCampaign(campaign.id);
+
+      setSuccess('Campaign paused.');
+
+      await loadCampaigns({
+        initial: false,
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to pause campaign.',
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function resumeCampaign(campaign: DeliveryCampaign) {
+    try {
+      setBusyId(campaign.id);
+
+      await window.appAPI.resumeCampaign(campaign.id);
+
+      setSuccess('Campaign returned to the delivery queue.');
+
+      await loadCampaigns({
+        initial: false,
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to resume campaign.',
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function retryFailed(campaign: DeliveryCampaign) {
+    const confirmed = window.confirm(
+      'Retry failed or uncertain work?\n\nMessages already recorded as sent will not be resent. An uncertain message may have been submitted before the app stopped, so retry it only if you accept that duplicate risk.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBusyId(campaign.id);
+
+      await window.appAPI.retryFailedCampaign(campaign.id);
+
+      setSuccess('Failed / uncertain work returned to the queue.');
+
+      await loadCampaigns({
+        initial: false,
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to retry campaign.',
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function cancelExecution(campaign: DeliveryCampaign) {
+    if (
+      !window.confirm(
+        `Cancel "${campaign.name}"?\n\nMessages already submitted will remain recorded. Pending work will stop.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBusyId(campaign.id);
+
+      await window.appAPI.cancelCampaignExecution(campaign.id);
+
+      setSuccess('Campaign cancelled.');
+
+      await loadCampaigns({
+        initial: false,
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to cancel campaign.',
       );
     } finally {
       setBusyId(null);
@@ -347,10 +464,13 @@ export function ScheduledPage() {
     (campaign) => campaign.status === 'queued',
   ).length;
 
-  const totalRecipients = campaigns.reduce(
-    (total, campaign) => total + campaign.recipientCount,
-    0,
-  );
+  const runningCount = campaigns.filter(
+    (campaign) => campaign.status === 'running',
+  ).length;
+
+  const pausedCount = campaigns.filter(
+    (campaign) => campaign.status === 'paused',
+  ).length;
 
   const nextScheduled = useMemo(
     () =>
@@ -363,6 +483,7 @@ export function ScheduledPage() {
             new Date(a.scheduledAt as string).getTime() -
             new Date(b.scheduledAt as string).getTime(),
         )[0] ?? null,
+
     [campaigns],
   );
 
@@ -370,7 +491,7 @@ export function ScheduledPage() {
     <>
       <PageHeader
         title="Scheduled"
-        description="Manage scheduled and queued campaigns before the WhatsApp sender begins processing."
+        description="Manage scheduling, delivery queue, and live WhatsApp campaign execution."
       />
 
       {error && (
@@ -380,17 +501,55 @@ export function ScheduledPage() {
       )}
 
       {success && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          <Check size={18} />
-
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           {success}
         </div>
       )}
 
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-emerald-50 p-2.5">
+            <Smartphone size={20} className="text-emerald-700" />
+          </div>
+
+          <div>
+            <p className="font-semibold">WhatsApp Web</p>
+
+            <p className="text-sm text-slate-500">
+              {whatsappStatus?.message ?? 'Checking connection...'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              whatsappStatus?.state === 'connected'
+                ? 'bg-emerald-50 text-emerald-700'
+                : whatsappStatus?.state === 'waiting_for_qr'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {whatsappStatus?.state ?? 'checking'}
+          </span>
+
+          {whatsappStatus?.state !== 'connected' && (
+            <button
+              type="button"
+              onClick={() => void connectWhatsApp()}
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Open WhatsApp
+            </button>
+          )}
+        </div>
+      </section>
+
       {loading ? (
         <div className="flex items-center gap-3 rounded-2xl border bg-white p-6 text-sm text-slate-500">
           <Loader2 className="animate-spin" size={18} />
-          Loading scheduled campaigns...
+          Loading delivery queue...
         </div>
       ) : campaigns.length === 0 ? (
         <EmptyState
@@ -400,7 +559,7 @@ export function ScheduledPage() {
         />
       ) : (
         <>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
                 Scheduled
@@ -411,7 +570,7 @@ export function ScheduledPage() {
 
             <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
-                Queued Now
+                Queued
               </p>
 
               <p className="mt-2 text-2xl font-bold">{queuedCount}</p>
@@ -419,10 +578,18 @@ export function ScheduledPage() {
 
             <div className="rounded-2xl border bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase text-slate-400">
-                Total Recipients
+                Running
               </p>
 
-              <p className="mt-2 text-2xl font-bold">{totalRecipients}</p>
+              <p className="mt-2 text-2xl font-bold">{runningCount}</p>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase text-slate-400">
+                Paused
+              </p>
+
+              <p className="mt-2 text-2xl font-bold">{pausedCount}</p>
             </div>
 
             <div className="rounded-2xl border bg-white p-5 shadow-sm">
@@ -444,13 +611,18 @@ export function ScheduledPage() {
                 <h3 className="font-semibold">Delivery Queue</h3>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Scheduled campaigns automatically become Queued when due.
+                  Only one campaign is processed at a time.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => void loadCampaigns(true)}
+                onClick={() =>
+                  void loadCampaigns({
+                    manual: true,
+                    initial: false,
+                  })
+                }
                 disabled={refreshing}
                 className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold"
               >
@@ -468,13 +640,15 @@ export function ScheduledPage() {
                   <tr>
                     <th className="px-5 py-3">Campaign</th>
 
-                    <th className="px-5 py-3">Delivery</th>
+                    <th className="px-5 py-3">Status</th>
 
-                    <th className="px-5 py-3">Recipients</th>
+                    <th className="px-5 py-3">Progress</th>
 
-                    <th className="px-5 py-3">Messages</th>
+                    <th className="px-5 py-3">Success</th>
 
-                    <th className="px-5 py-3">Scheduled For</th>
+                    <th className="px-5 py-3">Failed</th>
+
+                    <th className="px-5 py-3">Schedule</th>
 
                     <th className="px-5 py-3">Actions</th>
                   </tr>
@@ -483,56 +657,60 @@ export function ScheduledPage() {
                 <tbody className="divide-y">
                   {campaigns.map((campaign) => (
                     <tr key={campaign.id}>
-                      <td className="min-w-64 px-5 py-4">
+                      <td className="min-w-60 px-5 py-4">
                         <p className="font-semibold">{campaign.name}</p>
 
-                        <p className="mt-1 text-xs text-slate-500">
-                          {campaign.description || 'No description'}
-                        </p>
+                        <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                          <Users size={13} />
+                          {campaign.totalRecipients} recipients
+                        </div>
                       </td>
 
                       <td className="px-5 py-4">
                         <span
-                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClass(
+                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(
                             campaign.status,
                           )}`}
                         >
-                          {campaign.status === 'scheduled'
-                            ? 'Scheduled'
-                            : 'Queued'}
+                          {campaign.status}
                         </span>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <Users size={15} />
+                      <td className="min-w-40 px-5 py-4">
+                        <div className="flex items-center justify-between text-xs text-slate-500">
+                          <span>
+                            {campaign.processedCount}/{campaign.totalRecipients}
+                          </span>
 
-                          {campaign.recipientCount}
+                          <span>{progressPercentage(campaign)}%</span>
+                        </div>
+
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-emerald-500"
+                            style={{
+                              width: `${progressPercentage(campaign)}%`,
+                            }}
+                          />
                         </div>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <MessageSquare size={15} />
-
-                          {campaign.messageCount}
-                        </div>
+                      <td className="px-5 py-4 text-emerald-700">
+                        {campaign.successCount}
                       </td>
 
-                      <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                        {campaign.status === 'scheduled' ? (
-                          <div className="flex items-center gap-2">
-                            <Clock size={15} />
+                      <td className="px-5 py-4 text-red-700">
+                        {campaign.failureCount}
+                      </td>
 
-                            {formatColomboDateTime(campaign.scheduledAt)}
-                          </div>
-                        ) : campaign.scheduledAt ? (
-                          `Queued after ${formatColomboDateTime(
-                            campaign.scheduledAt,
-                          )}`
-                        ) : (
-                          'Send ASAP'
-                        )}
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">
+                        {campaign.scheduledAt
+                          ? formatColomboDateTime(campaign.scheduledAt)
+                          : campaign.startedAt
+                            ? `Started ${formatColomboDateTime(
+                                campaign.startedAt,
+                              )}`
+                            : 'Send ASAP'}
                       </td>
 
                       <td className="px-5 py-4">
@@ -546,7 +724,7 @@ export function ScheduledPage() {
                             <Eye size={16} />
                           </button>
 
-                          {campaign.status === 'scheduled' ? (
+                          {campaign.status === 'scheduled' && (
                             <>
                               <button
                                 type="button"
@@ -558,7 +736,7 @@ export function ScheduledPage() {
                                     isoToColomboInput(campaign.scheduledAt),
                                   );
                                 }}
-                                className="rounded-lg border border-blue-200 p-2 text-blue-700 disabled:opacity-50"
+                                className="rounded-lg border border-blue-200 p-2 text-blue-700"
                                 title="Reschedule"
                               >
                                 <Calendar size={16} />
@@ -568,7 +746,7 @@ export function ScheduledPage() {
                                 type="button"
                                 disabled={busyId === campaign.id}
                                 onClick={() => void sendNow(campaign)}
-                                className="rounded-lg border border-emerald-200 p-2 text-emerald-700 disabled:opacity-50"
+                                className="rounded-lg border border-emerald-200 p-2 text-emerald-700"
                                 title="Send Now"
                               >
                                 <Play size={16} />
@@ -577,23 +755,98 @@ export function ScheduledPage() {
                               <button
                                 type="button"
                                 disabled={busyId === campaign.id}
-                                onClick={() => setCancelTarget(campaign)}
-                                className="rounded-lg border border-amber-200 p-2 text-amber-700 disabled:opacity-50"
+                                onClick={() => void cancelSchedule(campaign)}
+                                className="rounded-lg border border-amber-200 p-2 text-amber-700"
                                 title="Cancel Schedule"
                               >
                                 <X size={16} />
                               </button>
                             </>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={busyId === campaign.id}
-                              onClick={() => setReturnTarget(campaign)}
-                              className="rounded-lg border border-slate-300 p-2 text-slate-700 disabled:opacity-50"
-                              title="Return to Draft"
-                            >
-                              <RotateCcw size={16} />
-                            </button>
+                          )}
+
+                          {campaign.status === 'queued' && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busyId === campaign.id}
+                                onClick={() => void returnToDraft(campaign)}
+                                className="rounded-lg border p-2"
+                                title="Return to Draft"
+                              >
+                                <RotateCcw size={16} />
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={busyId === campaign.id}
+                                onClick={() => void cancelExecution(campaign)}
+                                className="rounded-lg border border-red-200 p-2 text-red-700"
+                                title="Cancel"
+                              >
+                                <Square size={16} />
+                              </button>
+                            </>
+                          )}
+
+                          {campaign.status === 'running' && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busyId === campaign.id}
+                                onClick={() => void pauseCampaign(campaign)}
+                                className="rounded-lg border border-amber-200 p-2 text-amber-700"
+                                title="Pause"
+                              >
+                                <Pause size={16} />
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={busyId === campaign.id}
+                                onClick={() => void cancelExecution(campaign)}
+                                className="rounded-lg border border-red-200 p-2 text-red-700"
+                                title="Cancel"
+                              >
+                                <Square size={16} />
+                              </button>
+                            </>
+                          )}
+
+                          {campaign.status === 'paused' && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busyId === campaign.id}
+                                onClick={() => void resumeCampaign(campaign)}
+                                className="rounded-lg border border-emerald-200 p-2 text-emerald-700"
+                                title="Resume"
+                              >
+                                <Play size={16} />
+                              </button>
+
+                              {(campaign.failureCount > 0 ||
+                                campaign.uncertainCount > 0) && (
+                                <button
+                                  type="button"
+                                  disabled={busyId === campaign.id}
+                                  onClick={() => void retryFailed(campaign)}
+                                  className="rounded-lg border border-amber-200 p-2 text-amber-700"
+                                  title="Retry failed / uncertain"
+                                >
+                                  <RotateCcw size={16} />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={busyId === campaign.id}
+                                onClick={() => void cancelExecution(campaign)}
+                                className="rounded-lg border border-red-200 p-2 text-red-700"
+                                title="Cancel"
+                              >
+                                <Square size={16} />
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -666,70 +919,6 @@ export function ScheduledPage() {
                   Save Schedule
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {cancelTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold">Cancel Schedule?</h3>
-
-            <p className="mt-2 text-sm text-slate-500">
-              {cancelTarget.name} will return to Draft and become editable
-              again.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setCancelTarget(null)}
-                className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
-              >
-                Keep Scheduled
-              </button>
-
-              <button
-                type="button"
-                disabled={busyId === cancelTarget.id}
-                onClick={() => void confirmCancelSchedule()}
-                className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                Cancel Schedule
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {returnTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold">Return to Draft?</h3>
-
-            <p className="mt-2 text-sm text-slate-500">
-              {returnTarget.name} will leave the delivery queue and become
-              editable again.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setReturnTarget(null)}
-                className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
-              >
-                Keep Queued
-              </button>
-
-              <button
-                type="button"
-                disabled={busyId === returnTarget.id}
-                onClick={() => void confirmReturnToDraft()}
-                className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                Return to Draft
-              </button>
             </div>
           </div>
         </div>

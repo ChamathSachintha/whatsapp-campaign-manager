@@ -2,6 +2,64 @@ import type { ContactValidationResult } from './imports';
 
 export {};
 
+type SenderSettings = {
+  messageDelayMinMs: number;
+  messageDelayMaxMs: number;
+  recipientDelayMinMs: number;
+  recipientDelayMaxMs: number;
+  navigationTimeoutMs: number;
+  actionTimeoutMs: number;
+  mediaUploadTimeoutMs: number;
+};
+
+type WhatsAppStatus = {
+  state: 'disconnected' | 'opening' | 'waiting_for_qr' | 'connected' | 'error';
+
+  message: string;
+
+  browserName: string | null;
+};
+
+type DeliveryCampaign = {
+  id: string;
+
+  name: string;
+
+  description: string | null;
+
+  status: string;
+
+  sendMode: string;
+
+  timezone: string;
+
+  scheduledAt: string | null;
+
+  startedAt: string | null;
+
+  completedAt: string | null;
+
+  createdAt: string;
+
+  updatedAt: string;
+
+  totalRecipients: number;
+
+  processedCount: number;
+
+  successCount: number;
+
+  failureCount: number;
+
+  notContactable: number;
+
+  messageCount: number;
+
+  mediaCount: number;
+
+  uncertainCount: number;
+};
+
 declare global {
   interface Window {
     appAPI: {
@@ -407,6 +465,42 @@ declare global {
           mediaCount: number;
         }>
       >;
+
+      listDeliveryCampaigns: () => Promise<DeliveryCampaign[]>;
+
+      pauseCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+        status: string;
+      }>;
+
+      resumeCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+        status: string;
+      }>;
+
+      cancelCampaignExecution: (campaignId: string) => Promise<{
+        campaignId: string;
+        status: string;
+      }>;
+
+      retryFailedCampaign: (campaignId: string) => Promise<{
+        campaignId: string;
+        status: string;
+      }>;
+
+      listCampaignHistory: () => Promise<DeliveryCampaign[]>;
+
+      getSenderSettings: () => Promise<SenderSettings>;
+
+      updateSenderSettings: (
+        settings: SenderSettings,
+      ) => Promise<SenderSettings>;
+
+      connectWhatsApp: () => Promise<WhatsAppStatus>;
+
+      disconnectWhatsApp: () => Promise<WhatsAppStatus>;
+
+      getWhatsAppStatus: () => Promise<WhatsAppStatus>;
     };
   }
 }

@@ -8,6 +8,21 @@ import { closeDatabase, initializeDatabase } from './db/database';
 
 import { getDatabaseHealth } from './db/health';
 
+import {
+  cancelCampaignExecution,
+  listCampaignHistory,
+  listDeliveryCampaigns,
+  pauseRunningCampaign,
+  recoverInterruptedCampaigns,
+  resumeCampaign,
+  retryFailedCampaign,
+} from './services/campaigns/campaign-execution-repository';
+
+import {
+  startCampaignExecutor,
+  stopCampaignExecutor,
+} from './services/campaigns/campaign-executor';
+
 import { chooseCampaignAttachment } from './services/campaigns/media-picker';
 
 import {
@@ -43,6 +58,17 @@ import {
   listSavedImports,
   saveValidatedImport,
 } from './services/imports/import-repository';
+
+import {
+  getSenderSettings,
+  updateSenderSettings,
+} from './services/settings/sender-settings';
+
+import {
+  connectWhatsApp,
+  disconnectWhatsApp,
+  getWhatsAppStatus,
+} from './services/whatsapp/whatsapp-service';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 
@@ -97,7 +123,17 @@ const createWindow = (): void => {
 app.whenReady().then(() => {
   initializeDatabase();
 
+  const recoveredCount = recoverInterruptedCampaigns();
+
+  if (recoveredCount > 0) {
+    console.log(
+      `[Campaign Executor] Recovered ${recoveredCount} interrupted campaign(s) as paused.`,
+    );
+  }
+
   startCampaignScheduler();
+
+  startCampaignExecutor();
 
   ipcMain.handle('database:get-health', () => getDatabaseHealth());
 
@@ -353,6 +389,47 @@ app.whenReady().then(() => {
     return listScheduledCampaigns();
   });
 
+  ipcMain.handle('delivery:list', () => {
+    processDueCampaigns();
+
+    return listDeliveryCampaigns();
+  });
+
+  ipcMain.handle('delivery:pause', (_event, campaignId: string) =>
+    pauseRunningCampaign(campaignId),
+  );
+
+  ipcMain.handle('delivery:resume', (_event, campaignId: string) =>
+    resumeCampaign(campaignId),
+  );
+
+  ipcMain.handle('delivery:cancel', (_event, campaignId: string) =>
+    cancelCampaignExecution(campaignId),
+  );
+
+  ipcMain.handle('delivery:retry', (_event, campaignId: string) =>
+    retryFailedCampaign(campaignId),
+  );
+
+  ipcMain.handle('history:list', () => listCampaignHistory());
+
+  ipcMain.handle('sender:get-settings', () => getSenderSettings());
+
+  ipcMain.handle(
+    'sender:update-settings',
+    (
+      _event,
+
+      settings: Parameters<typeof updateSenderSettings>[0],
+    ) => updateSenderSettings(settings),
+  );
+
+  ipcMain.handle('whatsapp:connect', () => connectWhatsApp());
+
+  ipcMain.handle('whatsapp:disconnect', () => disconnectWhatsApp());
+
+  ipcMain.handle('whatsapp:get-status', () => getWhatsAppStatus());
+
   ipcMain.handle('app:get-version', () => app.getVersion());
 
   createWindow();
@@ -371,7 +448,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  stopCampaignExecutor();
+
   stopCampaignScheduler();
+
+  void disconnectWhatsApp();
 
   closeDatabase();
 });

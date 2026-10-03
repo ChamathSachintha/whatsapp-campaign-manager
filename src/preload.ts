@@ -129,4 +129,38 @@ contextBridge.exposeInMainWorld('appAPI', {
     ipcRenderer.invoke('campaigns:return-to-draft', campaignId),
 
   listScheduledCampaigns: () => ipcRenderer.invoke('campaigns:list-scheduled'),
+
+  listDeliveryCampaigns: () => ipcRenderer.invoke('delivery:list'),
+
+  pauseCampaign: (campaignId: string) =>
+    ipcRenderer.invoke('delivery:pause', campaignId),
+
+  resumeCampaign: (campaignId: string) =>
+    ipcRenderer.invoke('delivery:resume', campaignId),
+
+  cancelCampaignExecution: (campaignId: string) =>
+    ipcRenderer.invoke('delivery:cancel', campaignId),
+
+  retryFailedCampaign: (campaignId: string) =>
+    ipcRenderer.invoke('delivery:retry', campaignId),
+
+  listCampaignHistory: () => ipcRenderer.invoke('history:list'),
+
+  getSenderSettings: () => ipcRenderer.invoke('sender:get-settings'),
+
+  updateSenderSettings: (settings: {
+    messageDelayMinMs: number;
+    messageDelayMaxMs: number;
+    recipientDelayMinMs: number;
+    recipientDelayMaxMs: number;
+    navigationTimeoutMs: number;
+    actionTimeoutMs: number;
+    mediaUploadTimeoutMs: number;
+  }) => ipcRenderer.invoke('sender:update-settings', settings),
+
+  connectWhatsApp: () => ipcRenderer.invoke('whatsapp:connect'),
+
+  disconnectWhatsApp: () => ipcRenderer.invoke('whatsapp:disconnect'),
+
+  getWhatsAppStatus: () => ipcRenderer.invoke('whatsapp:get-status'),
 });
