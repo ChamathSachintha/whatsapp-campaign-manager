@@ -437,7 +437,7 @@ The app is built with Electron, React, TypeScript, Tailwind CSS, React Router, S
 
 ## Maintainer
 
-Created by **Chamath Sachintha** ❤️ — `chamathsachintha2002@gmail.com`
+Created by **Chamath Sachintha**
 
 [![Contact the maintainer](https://img.shields.io/badge/Contact_the_maintainer-334155?style=for-the-badge&logo=gmail&logoColor=white)](mailto:chamathsachintha2002@gmail.com)
 
